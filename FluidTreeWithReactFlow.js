@@ -15,7 +15,9 @@ const {
     Handle,
     Position,
     getBezierPath,
-    EdgeLabelRenderer
+    EdgeLabelRenderer,
+    useReactFlow,
+    ReactFlowProvider
 } = window.ReactFlow || {};
 
 // ==========================================
@@ -374,17 +376,45 @@ const calculateFluidLayout = (treeData) => {
 };
 
 // ==========================================
-// MAIN REACT FLOW COMPONENT
+// CONTROLS COMPONENT - Inside ReactFlow Context
 // ==========================================
-const FluidTreeWithReactFlow = ({ treeData, selectedPerson, onSelectPerson }) => {
-    if (!ReactFlow) {
-        return (
-            <div className="empty-state">
-                <p className="empty-text">React Flow library not loaded. Please add the script tag to your HTML.</p>
-            </div>
-        );
-    }
+const FluidTreeControls = ({ onResetLayout }) => {
+    const { fitView, zoomIn, zoomOut } = useReactFlow();
 
+    const handleAutoOrganize = () => {
+        fitView({
+            padding: 0.2,
+            duration: 800,
+            maxZoom: 1
+        });
+    };
+
+    return (
+        <div className="fluid-tree-controls">
+            <button
+                className="organize-btn"
+                onClick={handleAutoOrganize}
+                title="Auto-organize and fit all nodes into view"
+            >
+                <span className="organize-icon">⚡</span>
+                <span className="organize-text">Auto-Organize</span>
+            </button>
+            <div className="control-divider"></div>
+            <button
+                className="organize-btn-small"
+                onClick={onResetLayout}
+                title="Reset layout to original positions"
+            >
+                ↻ Reset
+            </button>
+        </div>
+    );
+};
+
+// ==========================================
+// INNER COMPONENT - Has access to ReactFlow context
+// ==========================================
+const FluidTreeInner = ({ treeData, selectedPerson, onSelectPerson }) => {
     // Calculate layout
     const { nodes: initialNodes, edges: initialEdges } = React.useMemo(
         () => calculateFluidLayout(treeData),
@@ -412,8 +442,23 @@ const FluidTreeWithReactFlow = ({ treeData, selectedPerson, onSelectPerson }) =>
         }
     }, [onSelectPerson]);
 
+    // Reset layout to initial positions
+    const handleResetLayout = React.useCallback(() => {
+        const { nodes: newNodes, edges: newEdges } = calculateFluidLayout(treeData);
+        setNodes(newNodes);
+        setEdges(newEdges);
+
+        // Fit view after resetting
+        setTimeout(() => {
+            const { fitView } = useReactFlow;
+            if (fitView) {
+                fitView({ padding: 0.2, duration: 800 });
+            }
+        }, 100);
+    }, [treeData, setNodes, setEdges]);
+
     return (
-        <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+        <>
             <ReactFlow
                 nodes={nodes}
                 edges={edges}
@@ -432,6 +477,32 @@ const FluidTreeWithReactFlow = ({ treeData, selectedPerson, onSelectPerson }) =>
             >
                 <Background color="#e5ddd2" gap={20} size={1} />
             </ReactFlow>
+            <FluidTreeControls onResetLayout={handleResetLayout} />
+        </>
+    );
+};
+
+// ==========================================
+// MAIN REACT FLOW COMPONENT - Wrapper with Provider
+// ==========================================
+const FluidTreeWithReactFlow = ({ treeData, selectedPerson, onSelectPerson }) => {
+    if (!ReactFlow) {
+        return (
+            <div className="empty-state">
+                <p className="empty-text">React Flow library not loaded. Please add the script tag to your HTML.</p>
+            </div>
+        );
+    }
+
+    return (
+        <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+            <ReactFlowProvider>
+                <FluidTreeInner
+                    treeData={treeData}
+                    selectedPerson={selectedPerson}
+                    onSelectPerson={onSelectPerson}
+                />
+            </ReactFlowProvider>
         </div>
     );
 };

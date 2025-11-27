@@ -158,7 +158,7 @@
 
     <script type="text/babel">
         const { useState, useMemo, useCallback } = React;
-        const { ReactFlow, Background, Handle, Position, useNodesState, useEdgesState } = window.ReactFlow;
+        const { ReactFlow, Background, Handle, Position, useNodesState, useEdgesState, useReactFlow, ReactFlowProvider } = window.ReactFlow;
 
         // Sample Family Tree Data
         const sampleTreeData = {
@@ -449,8 +449,42 @@
             return { nodes, edges };
         };
 
-        // Main Demo App
-        const DemoApp = () => {
+        // Controls Component
+        const DemoControls = ({ onResetLayout }) => {
+            const { fitView } = useReactFlow();
+
+            const handleAutoOrganize = () => {
+                fitView({
+                    padding: 0.2,
+                    duration: 800,
+                    maxZoom: 1
+                });
+            };
+
+            return (
+                <div className="fluid-tree-controls">
+                    <button
+                        className="organize-btn"
+                        onClick={handleAutoOrganize}
+                        title="Auto-organize and fit all nodes into view"
+                    >
+                        <span className="organize-icon">⚡</span>
+                        <span className="organize-text">Auto-Organize</span>
+                    </button>
+                    <div className="control-divider"></div>
+                    <button
+                        className="organize-btn-small"
+                        onClick={onResetLayout}
+                        title="Reset layout to original positions"
+                    >
+                        ↻ Reset
+                    </button>
+                </div>
+            );
+        };
+
+        // Inner Demo Component
+        const DemoInner = () => {
             const { nodes: initialNodes, edges: initialEdges } = useMemo(
                 () => calculateLayout(sampleTreeData),
                 []
@@ -468,45 +502,72 @@
                 fluidEdge: FluidEdge,
             }), []);
 
+            // Reset layout
+            const handleResetLayout = useCallback(() => {
+                const { nodes: newNodes, edges: newEdges } = calculateLayout(sampleTreeData);
+                setNodes(newNodes);
+                setEdges(newEdges);
+
+                setTimeout(() => {
+                    const { fitView } = useReactFlow();
+                    if (fitView) {
+                        fitView({ padding: 0.2, duration: 800 });
+                    }
+                }, 100);
+            }, [setNodes, setEdges]);
+
+            return (
+                <>
+                    <ReactFlow
+                        nodes={nodes}
+                        edges={edges}
+                        onNodesChange={onNodesChange}
+                        onEdgesChange={onEdgesChange}
+                        nodeTypes={nodeTypes}
+                        edgeTypes={edgeTypes}
+                        fitView
+                        minZoom={0.2}
+                        maxZoom={2}
+                        defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
+                        nodesDraggable={true}
+                        nodesConnectable={false}
+                    >
+                        <Background color="#e5ddd2" gap={20} size={1} />
+                    </ReactFlow>
+                    <DemoControls onResetLayout={handleResetLayout} />
+
+                    <div className="info-panel">
+                        <h3>Features</h3>
+                        <ul>
+                            <li>Smooth curved relationship lines</li>
+                            <li>Marriage nodes as connectors</li>
+                            <li>Animated dashed edges</li>
+                            <li>Gender-based node colors</li>
+                            <li>Draggable & responsive</li>
+                            <li>Auto-routing when moved</li>
+                            <li><strong>⚡ Auto-Organize button!</strong></li>
+                        </ul>
+                    </div>
+                </>
+            );
+        };
+
+        // Main Demo App
+        const DemoApp = () => {
             return (
                 <div className="demo-container">
                     <div className="demo-header">
                         <div>
                             <div className="demo-title">🌳 Fluid Family Tree Demo</div>
                             <div className="demo-subtitle">
-                                Drag nodes to reposition • Scroll to zoom • Click nodes to select
+                                Drag nodes to reposition • Scroll to zoom • Click ⚡ to auto-organize
                             </div>
                         </div>
                     </div>
                     <div className="demo-canvas">
-                        <ReactFlow
-                            nodes={nodes}
-                            edges={edges}
-                            onNodesChange={onNodesChange}
-                            onEdgesChange={onEdgesChange}
-                            nodeTypes={nodeTypes}
-                            edgeTypes={edgeTypes}
-                            fitView
-                            minZoom={0.2}
-                            maxZoom={2}
-                            defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
-                            nodesDraggable={true}
-                            nodesConnectable={false}
-                        >
-                            <Background color="#e5ddd2" gap={20} size={1} />
-                        </ReactFlow>
-
-                        <div className="info-panel">
-                            <h3>Features</h3>
-                            <ul>
-                                <li>Smooth curved relationship lines</li>
-                                <li>Marriage nodes as connectors</li>
-                                <li>Animated dashed edges</li>
-                                <li>Gender-based node colors</li>
-                                <li>Draggable & responsive</li>
-                                <li>Auto-routing when moved</li>
-                            </ul>
-                        </div>
+                        <ReactFlowProvider>
+                            <DemoInner />
+                        </ReactFlowProvider>
                     </div>
                 </div>
             );
