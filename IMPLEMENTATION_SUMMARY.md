@@ -73,6 +73,8 @@ I've created a complete **familybushes.com-style** fluid relationship line syste
 - ✅ Draggable nodes with live edge updates
 - ✅ Zoom and pan controls
 - ✅ Click to select nodes
+- ✅ **⚡ Auto-Organize button** - fits all nodes into view with one click
+- ✅ **↻ Reset button** - restores original layout positions
 - ✅ Smooth transitions and animations
 - ✅ Responsive to screen sizes
 
@@ -114,6 +116,30 @@ End:    (targetX, targetY)
 ```
 
 This creates the smooth "S-curve" characteristic of professional genealogy tools.
+
+---
+
+## ⚡ Using the Auto-Organize Button
+
+The new **Auto-Organize** button is located in the top-right corner and provides two powerful functions:
+
+### **⚡ Auto-Organize**
+- **What it does**: Automatically fits all family tree nodes into the viewport
+- **When to use**: After dragging nodes around, when some nodes are off-screen, or when you want optimal viewing
+- **How it works**: Uses React Flow's `fitView()` with 20% padding and smooth 800ms animation
+- **Shortcut**: Click the lightning bolt button
+
+### **↻ Reset**
+- **What it does**: Recalculates the entire layout and restores original positions
+- **When to use**: After extensive dragging, to get back to the clean algorithmic layout
+- **How it works**: Re-runs the generation-based layout algorithm from scratch
+- **Result**: Perfect hierarchical arrangement with proper spacing
+
+### **Visual Feedback**
+- Lightning bolt icon ⚡ pulses gently to draw attention
+- Smooth zoom and pan animation when organizing
+- Button has gradient background matching the app theme
+- On mobile, text label hides but icon remains visible
 
 ---
 
