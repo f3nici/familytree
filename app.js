@@ -50,6 +50,116 @@
             return age;
         };
 
+        const sampleTreeData = () => {
+            const people = {
+                a1: {
+                    name: 'Eleanor',
+                    surname: 'Hughes',
+                    gender: 'FEMALE',
+                    events: [
+                        { type: '$_BIRTH', dateStart: '1952-04-09' },
+                    ],
+                },
+                a2: {
+                    name: 'Thomas',
+                    surname: 'Hughes',
+                    gender: 'MALE',
+                    events: [
+                        { type: '$_BIRTH', dateStart: '1949-09-02' },
+                    ],
+                },
+                a3: {
+                    name: 'Marcia',
+                    surname: 'Ngata',
+                    gender: 'FEMALE',
+                    events: [
+                        { type: '$_BIRTH', dateStart: '1954-12-17' },
+                        { type: '$_DEATH', dateStart: '2018-03-02' },
+                    ],
+                },
+                b1: {
+                    name: 'Olivia',
+                    surname: 'Hughes',
+                    gender: 'FEMALE',
+                    events: [
+                        { type: '$_BIRTH', dateStart: '1977-07-16' },
+                    ],
+                },
+                b2: {
+                    name: 'Mason',
+                    surname: 'Hughes',
+                    gender: 'MALE',
+                    events: [
+                        { type: '$_BIRTH', dateStart: '1979-02-01' },
+                    ],
+                },
+                b3: {
+                    name: 'Isabelle',
+                    surname: 'Hughes',
+                    gender: 'FEMALE',
+                    events: [
+                        { type: '$_BIRTH', dateStart: '1982-11-23' },
+                    ],
+                },
+                b4: {
+                    name: 'Caleb',
+                    surname: 'Wong',
+                    gender: 'MALE',
+                    events: [
+                        { type: '$_BIRTH', dateStart: '1976-05-30' },
+                    ],
+                },
+                c1: {
+                    name: 'Etta',
+                    surname: 'Wong',
+                    gender: 'FEMALE',
+                    events: [
+                        { type: '$_BIRTH', dateStart: '2008-08-20' },
+                    ],
+                },
+                c2: {
+                    name: 'Jonas',
+                    surname: 'Hughes',
+                    gender: 'MALE',
+                    events: [
+                        { type: '$_BIRTH', dateStart: '2010-04-04' },
+                    ],
+                },
+                c3: {
+                    name: 'Piper',
+                    surname: 'Lane',
+                    gender: 'FEMALE',
+                    events: [
+                        { type: '$_BIRTH', dateStart: '2006-10-12' },
+                    ],
+                },
+                c4: {
+                    name: 'Noah',
+                    surname: 'Lane',
+                    gender: 'MALE',
+                    events: [
+                        { type: '$_BIRTH', dateStart: '2004-09-01' },
+                    ],
+                },
+            };
+
+            return {
+                id: generateId(),
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                name: 'Hughes & Ngata Family',
+                events: emptyTreeData.events,
+                attributes: [],
+                people,
+                mariages: [
+                    ['a1', 'a2', 'b1', 'b2'],
+                    ['a2', 'a3', 'b3'],
+                    ['b3', 'b4', 'c1', 'c2'],
+                    ['b2', 'c3', 'c4'],
+                ],
+            };
+        };
+
         const generateId = () => {
             return Math.random().toString(36).substr(2, 9);
         };
@@ -628,133 +738,351 @@
             );
         };
 
-        // Fluid Tree View - Shows all people as cards with visual relationship indicators
-        const FluidTreeView = ({ treeData, selectedPerson, onSelectPerson, isEditMode }) => {
-            const sortedPeople = useMemo(() => {
-                return Object.entries(treeData.people).sort((a, b) => {
+        const computeGenerations = (treeData) => {
+            const people = treeData.people;
+            const marriages = treeData.mariages;
+            const personGenerations = {};
+            const visited = new Set();
+
+            const childIds = new Set();
+            const parentIds = new Set();
+
+            marriages.forEach(marriage => {
+                if (marriage.length >= 2) {
+                    parentIds.add(marriage[0]);
+                    parentIds.add(marriage[1]);
+                    marriage.slice(2).forEach(childId => childIds.add(childId));
+                }
+            });
+
+            const rootIds = [...parentIds].filter(id => !childIds.has(id));
+
+            if (rootIds.length === 0) {
+                const sortedByBirth = Object.entries(people).sort((a, b) => {
                     const birthA = a[1].events?.find(e => e.type === '$_BIRTH')?.dateStart || '9999';
                     const birthB = b[1].events?.find(e => e.type === '$_BIRTH')?.dateStart || '9999';
                     return birthA.localeCompare(birthB);
                 });
-            }, [treeData.people]);
+                if (sortedByBirth.length > 0) {
+                    rootIds.push(sortedByBirth[0][0]);
+                }
+            }
 
-            return (
-                <div className="fluid-tree">
-                    {sortedPeople.map(([personId, person]) => (
-                        <PersonCard 
-                            key={personId}
-                            person={person}
-                            personId={personId}
-                            isSelected={selectedPerson === personId}
-                            onClick={onSelectPerson}
-                            isEditMode={isEditMode}
-                            compact={true}
-                        />
-                    ))}
-                </div>
-            );
+            const queue = rootIds.map(id => ({ id, gen: 0 }));
+
+            while (queue.length > 0) {
+                const { id, gen } = queue.shift();
+                if (visited.has(id)) continue;
+                visited.add(id);
+                personGenerations[id] = gen;
+
+                marriages.forEach(marriage => {
+                    if (marriage.length >= 2 && (marriage[0] === id || marriage[1] === id)) {
+                        const spouseId = marriage[0] === id ? marriage[1] : marriage[0];
+                        if (!visited.has(spouseId)) {
+                            queue.push({ id: spouseId, gen });
+                        }
+                        marriage.slice(2).forEach(childId => {
+                            if (!visited.has(childId)) {
+                                queue.push({ id: childId, gen: gen + 1 });
+                            }
+                        });
+                    }
+                });
+            }
+
+            Object.keys(people).forEach(id => {
+                if (!visited.has(id)) {
+                    personGenerations[id] = 0;
+                }
+            });
+
+            return personGenerations;
         };
 
-        // Strict Tree View - Hierarchical generations view
-        const StrictTreeView = ({ treeData, selectedPerson, onSelectPerson, isEditMode }) => {
-            // Build generation data
-            const generations = useMemo(() => {
-                const people = treeData.people;
-                const marriages = treeData.mariages;
-                const personGenerations = {};
-                const visited = new Set();
-                
-                // Find root people (those who appear as parents but not as children)
-                const childIds = new Set();
-                const parentIds = new Set();
-                
-                marriages.forEach(marriage => {
-                    if (marriage.length >= 2) {
-                        parentIds.add(marriage[0]);
-                        parentIds.add(marriage[1]);
-                        marriage.slice(2).forEach(childId => childIds.add(childId));
-                    }
-                });
-                
-                const rootIds = [...parentIds].filter(id => !childIds.has(id));
-                
-                // If no roots found, use oldest people by birth date
-                if (rootIds.length === 0) {
-                    const sortedByBirth = Object.entries(people).sort((a, b) => {
-                        const birthA = a[1].events?.find(e => e.type === '$_BIRTH')?.dateStart || '9999';
-                        const birthB = b[1].events?.find(e => e.type === '$_BIRTH')?.dateStart || '9999';
-                        return birthA.localeCompare(birthB);
-                    });
-                    if (sortedByBirth.length > 0) {
-                        rootIds.push(sortedByBirth[0][0]);
-                    }
-                }
-                
-                // BFS to assign generations
-                const queue = rootIds.map(id => ({ id, gen: 0 }));
-                
-                while (queue.length > 0) {
-                    const { id, gen } = queue.shift();
-                    if (visited.has(id)) continue;
-                    visited.add(id);
-                    personGenerations[id] = gen;
-                    
-                    // Find children
-                    marriages.forEach(marriage => {
-                        if (marriage.length >= 2 && (marriage[0] === id || marriage[1] === id)) {
-                            // Add spouse at same generation
-                            const spouseId = marriage[0] === id ? marriage[1] : marriage[0];
-                            if (!visited.has(spouseId)) {
-                                queue.push({ id: spouseId, gen });
-                            }
-                            // Add children at next generation
-                            marriage.slice(2).forEach(childId => {
-                                if (!visited.has(childId)) {
-                                    queue.push({ id: childId, gen: gen + 1 });
-                                }
-                            });
-                        }
-                    });
-                }
-                
-                // Add any unvisited people
-                Object.keys(people).forEach(id => {
-                    if (!visited.has(id)) {
-                        personGenerations[id] = 0;
-                    }
-                });
-                
-                // Group by generation
-                const gens = {};
-                Object.entries(personGenerations).forEach(([id, gen]) => {
-                    if (!gens[gen]) gens[gen] = [];
-                    gens[gen].push(id);
-                });
-                
-                return gens;
-            }, [treeData]);
+        const RelationshipGraph = ({ treeData, selectedPerson, onSelectPerson, viewMode, onRegisterZoom }) => {
+            const svgRef = useRef(null);
+            const containerRef = useRef(null);
+            const zoomRef = useRef(null);
+            const simulationRef = useRef(null);
 
-            const generationLabels = ['Grandparents', 'Parents', 'Children', 'Grandchildren', 'Great-grandchildren'];
+            useEffect(() => {
+                if (!treeData || !containerRef.current || !svgRef.current || !window.d3) return;
+
+                const d3Ref = window.d3;
+                const width = containerRef.current.clientWidth;
+                const height = containerRef.current.clientHeight;
+
+                const generations = computeGenerations(treeData);
+                const nodes = [];
+                const links = [];
+
+                Object.entries(treeData.people).forEach(([id, person]) => {
+                    nodes.push({ id, type: 'person', person, level: generations[id] || 0 });
+                });
+
+                treeData.mariages.forEach((marriage, index) => {
+                    if (marriage.length < 2) return;
+                    const marriageId = `marriage-${index}`;
+                    const parentA = marriage[0];
+                    const parentB = marriage[1];
+                    const children = marriage.slice(2);
+                    const level = Math.min(generations[parentA] || 0, generations[parentB] || 0);
+
+                    nodes.push({ id: marriageId, type: 'marriage', level });
+
+                    links.push({ source: parentA, target: marriageId, type: 'partner' });
+                    links.push({ source: parentB, target: marriageId, type: 'partner' });
+
+                    children.forEach(childId => {
+                        links.push({ source: marriageId, target: childId, type: 'child' });
+                    });
+                });
+
+                const svg = d3Ref.select(svgRef.current);
+                svg.selectAll('*').remove();
+                svg.style('overflow', 'visible');
+
+                const g = svg.append('g').attr('class', 'graph-layer');
+
+                zoomRef.current = d3Ref.zoom()
+                    .scaleExtent([0.4, 2.5])
+                    .on('zoom', (event) => {
+                        g.attr('transform', event.transform);
+                    });
+
+                svg.call(zoomRef.current);
+
+                if (onRegisterZoom) {
+                    onRegisterZoom({
+                        zoomIn: () => svg.transition().duration(200).call(zoomRef.current.scaleBy, 1.15),
+                        zoomOut: () => svg.transition().duration(200).call(zoomRef.current.scaleBy, 0.85),
+                        reset: () => svg.transition().duration(250).call(
+                            zoomRef.current.transform,
+                            d3Ref.zoomIdentity.translate(width / 2, height / 2).scale(viewMode === 'strict' ? 0.9 : 0.8)
+                        ),
+                    });
+                }
+
+                simulationRef.current?.stop();
+                const levelGap = 220;
+
+                const levelBuckets = {};
+                nodes.forEach(node => {
+                    if (node.type !== 'person') return;
+                    const level = node.level || 0;
+                    if (!levelBuckets[level]) levelBuckets[level] = [];
+                    levelBuckets[level].push(node);
+                });
+
+                const levelPosition = {};
+                Object.entries(levelBuckets).forEach(([level, bucket]) => {
+                    bucket.sort((a, b) => {
+                        const nameA = a.person?.name || '';
+                        const nameB = b.person?.name || '';
+                        return nameA.localeCompare(nameB);
+                    });
+                    const spacing = 240;
+                    const offset = (bucket.length - 1) * spacing * 0.5;
+                    bucket.forEach((node, index) => {
+                        levelPosition[node.id] = (width / 2) + (index * spacing - offset);
+                    });
+                });
+
+                const nodeById = new Map(nodes.map(n => [n.id, n]));
+                const resolvedLinks = links.map(link => {
+                    const source = typeof link.source === 'string' ? nodeById.get(link.source) : link.source;
+                    const target = typeof link.target === 'string' ? nodeById.get(link.target) : link.target;
+                    return { ...link, source, target };
+                });
+
+                const link = g.append('g')
+                    .attr('stroke-linecap', 'round')
+                    .selectAll('line')
+                    .data(resolvedLinks)
+                    .enter()
+                    .append('line')
+                    .attr('class', d => `connection-line ${d.type === 'partner' ? 'partner' : d.type === 'child' ? 'parent-child' : ''}`)
+                    .attr('stroke-opacity', 0.9);
+
+                const node = g.append('g')
+                    .selectAll('g')
+                    .data(nodes)
+                    .enter()
+                    .append('g')
+                    .attr('class', 'graph-node');
+
+                node.filter(d => d.type === 'marriage')
+                    .append('circle')
+                    .attr('r', 10)
+                    .attr('class', 'marriage-node');
+
+                const personNodes = node.filter(d => d.type === 'person');
+                personNodes
+                    .append('foreignObject')
+                    .attr('x', -100)
+                    .attr('y', -90)
+                    .attr('width', 200)
+                    .attr('height', 190)
+                    .html(d => {
+                        const person = d.person;
+                        const birthEvent = person.events?.find(e => e.type === '$_BIRTH');
+                        const deathEvent = person.events?.find(e => e.type === '$_DEATH');
+                        const avatarClass = person.gender === 'MALE' ? 'avatar-male' :
+                            person.gender === 'FEMALE' ? 'avatar-female' : 'avatar-other';
+                        const isDeceased = !!deathEvent;
+                        const selectedClass = selectedPerson === d.id ? 'selected' : '';
+
+                        return `
+                            <div class="tree-node ${selectedClass} ${isDeceased ? 'deceased' : ''}" data-person-id="${d.id}">
+                                <div class="node-avatar ${avatarClass}">${getInitials(person.name)}</div>
+                                <div class="node-name">${person.name}</div>
+                                <div class="node-surname">${person.surname || ''}</div>
+                                <div class="node-dates">
+                                    ${birthEvent?.dateStart ? formatDate(birthEvent.dateStart) : ''}
+                                    ${birthEvent?.dateStart && deathEvent?.dateStart ? ' — ' : ''}
+                                    ${deathEvent?.dateStart ? formatDate(deathEvent.dateStart) : ''}
+                                </div>
+                            </div>
+                        `;
+                    })
+                    .on('click', (_, d) => {
+                        onSelectPerson?.(d.id);
+                    });
+
+                const addDrag = (simulation) => {
+                    const drag = simulation => {
+                        function dragstarted(event, d) {
+                            if (!event.active) simulation.alphaTarget(0.25).restart();
+                            d.fx = d.x;
+                            d.fy = d.y;
+                        }
+
+                        function dragged(event, d) {
+                            d.fx = event.x;
+                            d.fy = event.y;
+                        }
+
+                        function dragended(event, d) {
+                            if (!event.active) simulation.alphaTarget(0);
+                            d.fx = null;
+                            d.fy = null;
+                        }
+
+                        return d3Ref.drag()
+                            .on('start', dragstarted)
+                            .on('drag', dragged)
+                            .on('end', dragended);
+                    };
+
+                    node.call(drag(simulation));
+                };
+
+                const fitGraphToView = () => {
+                    const bbox = g.node()?.getBBox();
+                    if (!bbox || !isFinite(bbox.width) || !isFinite(bbox.height)) return;
+                    const padding = 200;
+                    const scale = Math.min(
+                        2.5,
+                        Math.max(0.4, Math.min(width / (bbox.width + padding), height / (bbox.height + padding)))
+                    );
+                    const translateX = (width / 2) - (bbox.x + bbox.width / 2) * scale;
+                    const translateY = (height / 2) - (bbox.y + bbox.height / 2) * scale;
+                    const transform = d3Ref.zoomIdentity.translate(translateX, translateY).scale(scale);
+                    svg.call(zoomRef.current.transform, transform);
+                };
+
+                if (viewMode === 'strict') {
+                    nodes.forEach(node => {
+                        node.x = levelPosition[node.id] ?? width / 2;
+                        node.y = (node.level || 0) * levelGap + 80;
+                    });
+
+                    resolvedLinks.forEach(link => {
+                        if (link.source?.type === 'marriage') {
+                            link.source.x = link.source.x ?? width / 2;
+                            link.source.y = link.source.y ?? ((link.source.level || 0) * levelGap + 80);
+                        }
+                        if (link.type === 'partner' && link.source?.type === 'marriage' && link.target?.type === 'person') {
+                            link.source.x = (link.source.x + link.target.x) / 2;
+                        }
+                        if (link.type === 'partner' && link.target?.type === 'marriage' && link.source?.type === 'person') {
+                            link.target.x = (link.target.x + link.source.x) / 2;
+                        }
+                        if (link.type === 'child' && link.source?.type === 'marriage') {
+                            if (link.target?.x !== undefined) {
+                                link.source.x = link.source.x ?? link.target.x;
+                            }
+                        }
+                        link.source.y = link.source.y ?? ((link.source?.level || 0) * levelGap + 80);
+                        link.target.y = link.target.y ?? ((link.target?.level || 0) * levelGap + 80);
+                    });
+
+                    link
+                        .attr('x1', d => d.source.x)
+                        .attr('y1', d => d.source.y)
+                        .attr('x2', d => d.target.x)
+                        .attr('y2', d => d.target.y);
+
+                    node.attr('transform', d => `translate(${d.x},${d.y})`);
+
+                    const maxLevel = Math.max(...nodes.filter(n => n.type === 'person').map(n => n.level || 0), 0);
+                    const labels = Array.from({ length: maxLevel + 1 }, (_, i) => i);
+                    g.append('g')
+                        .selectAll('text')
+                        .data(labels)
+                        .enter()
+                        .append('text')
+                        .attr('class', 'graph-label')
+                        .attr('x', 24 - width / 2)
+                        .attr('y', level => (level * levelGap) + 20)
+                        .text(level => `Generation ${level + 1}`)
+                        .attr('transform', `translate(${width / 2}, 0)`);
+
+                    fitGraphToView();
+                } else {
+                    simulationRef.current = d3Ref.forceSimulation(nodes)
+                        .force('link', d3Ref.forceLink(resolvedLinks).id(d => d.id).distance(link => {
+                            if (link.type === 'partner') return 140;
+                            return 200;
+                        }).strength(link => link.type === 'partner' ? 1 : 0.9))
+                        .force('charge', d3Ref.forceManyBody().strength(-950))
+                        .force('collide', d3Ref.forceCollide().radius(d => d.type === 'person' ? 110 : 32).strength(1))
+                        .force('center', d3Ref.forceCenter(width / 2, height / 2))
+                        .force('y', d3Ref.forceY(height / 2).strength(0.1))
+                        .force('x', d3Ref.forceX(width / 2).strength(0.1))
+                        .alphaDecay(0.05);
+
+                    simulationRef.current.on('tick', () => {
+                        link
+                            .attr('x1', d => d.source.x)
+                            .attr('y1', d => d.source.y)
+                            .attr('x2', d => d.target.x)
+                            .attr('y2', d => d.target.y);
+
+                        node.attr('transform', d => `translate(${d.x},${d.y})`);
+                    });
+
+                    addDrag(simulationRef.current);
+                    setTimeout(() => fitGraphToView(), 300);
+                }
+
+                if (onRegisterZoom) {
+                    onRegisterZoom({
+                        zoomIn: () => svg.transition().duration(200).call(zoomRef.current.scaleBy, 1.15),
+                        zoomOut: () => svg.transition().duration(200).call(zoomRef.current.scaleBy, 0.85),
+                        reset: () => fitGraphToView(),
+                    });
+                }
+
+                return () => {
+                    simulationRef.current?.stop();
+                };
+            }, [treeData, viewMode, selectedPerson, onSelectPerson, onRegisterZoom]);
 
             return (
-                <div className="tree-strict">
-                    {Object.entries(generations).sort((a, b) => Number(a[0]) - Number(b[0])).map(([gen, peopleIds]) => (
-                        <div key={gen} className="generation-row">
-                            <span className="generation-label">
-                                {generationLabels[Number(gen)] || `Gen ${Number(gen) + 1}`}
-                            </span>
-                            {peopleIds.map(personId => (
-                                <PersonCard 
-                                    key={personId}
-                                    person={treeData.people[personId]}
-                                    personId={personId}
-                                    isSelected={selectedPerson === personId}
-                                    onClick={onSelectPerson}
-                                    isEditMode={isEditMode}
-                                />
-                            ))}
-                        </div>
-                    ))}
+                <div className="graph-container" ref={containerRef}>
+                    <svg ref={svgRef} className="graph-svg" />
                 </div>
             );
         };
@@ -768,7 +1096,7 @@
             const [searchQuery, setSearchQuery] = useState('');
             const [showAddPersonModal, setShowAddPersonModal] = useState(false);
             const [showAddMarriageModal, setShowAddMarriageModal] = useState(false);
-            const [zoom, setZoom] = useState(1);
+            const zoomApiRef = useRef({});
             
             const fileInputRef = useRef(null);
 
@@ -791,6 +1119,8 @@
                     } catch (e) {
                         console.error('Failed to parse saved data');
                     }
+                } else {
+                    setTreeData(sampleTreeData());
                 }
             }, []);
 
@@ -1119,7 +1449,7 @@
 
                         {/* Tree Canvas */}
                         <main className="tree-canvas">
-                            <div className="tree-viewport" style={{transform: `scale(${zoom})`, transformOrigin: 'top center'}}>
+                            <div className="tree-viewport">
                                 <div className="tree-content">
                                     {Object.keys(treeData.people).length === 0 ? (
                                         <div className="empty-state">
@@ -1129,8 +1459,8 @@
                                                 Add your first family member to begin building your tree.
                                             </p>
                                             {isEditMode && (
-                                                <button 
-                                                    className="btn btn-primary" 
+                                                <button
+                                                    className="btn btn-primary"
                                                     style={{marginTop: '24px'}}
                                                     onClick={() => setShowAddPersonModal(true)}
                                                 >
@@ -1138,35 +1468,29 @@
                                                 </button>
                                             )}
                                         </div>
-                                    ) : viewMode === 'fluid' ? (
-                                        <FluidTreeView 
-                                            treeData={treeData}
-                                            selectedPerson={selectedPerson}
-                                            onSelectPerson={setSelectedPerson}
-                                            isEditMode={isEditMode}
-                                        />
                                     ) : (
-                                        <StrictTreeView 
+                                        <RelationshipGraph
                                             treeData={treeData}
                                             selectedPerson={selectedPerson}
                                             onSelectPerson={setSelectedPerson}
-                                            isEditMode={isEditMode}
+                                            viewMode={viewMode}
+                                            onRegisterZoom={(api) => { zoomApiRef.current = api; }}
                                         />
                                     )}
                                 </div>
                             </div>
-                            
+
                             {/* Zoom Controls */}
                             <div className="zoom-controls">
-                                <button className="zoom-btn" onClick={() => setZoom(z => Math.min(z + 0.1, 2))}>
+                                <button className="zoom-btn" onClick={() => zoomApiRef.current?.zoomIn?.()}>
                                     {Icons.zoomIn}
                                 </button>
                                 <div className="zoom-divider" />
-                                <button className="zoom-btn" onClick={() => setZoom(1)}>
+                                <button className="zoom-btn" onClick={() => zoomApiRef.current?.reset?.()}>
                                     {Icons.reset}
                                 </button>
                                 <div className="zoom-divider" />
-                                <button className="zoom-btn" onClick={() => setZoom(z => Math.max(z - 0.1, 0.5))}>
+                                <button className="zoom-btn" onClick={() => zoomApiRef.current?.zoomOut?.()}>
                                     {Icons.zoomOut}
                                 </button>
                             </div>
