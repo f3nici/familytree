@@ -18,10 +18,9 @@ concurrency:
 
 jobs:
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    environment: ${{ github.ref == 'refs/heads/testing' && 'testing-pages' || 'github-pages' }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
