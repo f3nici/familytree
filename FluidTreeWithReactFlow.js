@@ -414,88 +414,15 @@ const applyWebMode = async (nodes, edges) => {
         // Create a copy of nodes to avoid mutation
         const nodesCopy = nodes.map(n => ({ ...n }));
 
-        // Calculate generation for each node to enable generation-based Y constraints
-        const generationMap = new Map();
-        const childToParentMarriage = new Map();
-        const marriageToParents = new Map();
-
-        // Build relationship maps from edges
-        edges.forEach(edge => {
-            if (edge.data?.type === 'marriage') {
-                const marriageId = edge.target;
-                const parentId = edge.source;
-                if (!marriageToParents.has(marriageId)) {
-                    marriageToParents.set(marriageId, []);
-                }
-                marriageToParents.get(marriageId).push(parentId);
-            } else if (edge.data?.type === 'child') {
-                const marriageId = edge.source;
-                const childId = edge.target;
-                childToParentMarriage.set(childId, marriageId);
-            }
-        });
-
-        // Find root nodes (nodes that are not children)
-        const allPersonNodes = nodesCopy.filter(n => n.type === 'personNode');
-        const rootNodes = allPersonNodes.filter(n => !childToParentMarriage.has(n.id));
-
-        // BFS to assign generations
-        const queue = rootNodes.map(n => ({ id: n.id, generation: 0 }));
-        const visited = new Set();
-
-        while (queue.length > 0) {
-            const { id, generation } = queue.shift();
-            if (visited.has(id)) continue;
-            visited.add(id);
-            generationMap.set(id, generation);
-
-            // Find all marriages this person is part of
-            edges.forEach(edge => {
-                if (edge.data?.type === 'marriage' && edge.source === id) {
-                    const marriageId = edge.target;
-                    generationMap.set(marriageId, generation + 0.5); // Marriage nodes between generations
-
-                    // Find children of this marriage
-                    edges.forEach(childEdge => {
-                        if (childEdge.data?.type === 'child' && childEdge.source === marriageId) {
-                            const childId = childEdge.target;
-                            if (!visited.has(childId)) {
-                                queue.push({ id: childId, generation: generation + 1 });
-                            }
-                        }
-                    });
-                }
-            });
-        }
-
-        // Set generation 0 for any unvisited nodes
-        nodesCopy.forEach(node => {
-            if (!generationMap.has(node.id)) {
-                generationMap.set(node.id, 0);
-            }
-        });
-
-        console.log('📊 Generation map:', Object.fromEntries(generationMap));
-
-        // Create simulation nodes with initial positions and generation constraints
-        const generationHeight = 300; // Vertical spacing between generations
-        const baseY = 200;
-
-        const simNodes = nodesCopy.map(node => {
-            const generation = generationMap.get(node.id) || 0;
-            const targetY = baseY + (generation * generationHeight);
-
-            return {
-                id: node.id,
-                x: node.position.x + 90, // Center of node (nodeWidth/2)
-                y: targetY, // Set Y based on generation
-                fx: null, // Allow X movement
-                fy: null, // Allow Y movement but will be strongly attracted to generation Y
-                type: node.type,
-                generation: generation,
-                targetY: targetY
-            };
-        });
+        // Create simulation nodes with initial positions
+        const simNodes = nodesCopy.map(node => ({
+            id: node.id,
+            x: node.position.x + 90, // Center of node (nodeWidth/2)
+            y: node.position.y + 70, // Center of node (nodeHeight/2)
+            fx: null, // Allow free movement
+            fy: null,
+            type: node.type
+        }));
 
         // Create simulation links from edges
         const simLinks = edges.map(edge => ({
@@ -506,53 +433,51 @@ const applyWebMode = async (nodes, edges) => {
 
         console.log('🔧 Creating d3 simulation with', simNodes.length, 'nodes and', simLinks.length, 'links');
 
-        // Configure d3-force simulation with generation-based Y constraints
+        // Configure d3-force simulation for natural web-like layout
         const simulation = d3.forceSimulation(simNodes)
             // Attraction between connected nodes
             .force('link', d3.forceLink(simLinks)
                 .id(d => d.id)
                 .distance(d => {
                     // Marriage edges: parents close to marriage node
-                    if (d.type === 'marriage') return 200;
+                    if (d.type === 'marriage') return 180;
                     // Child edges: marriage node to children
                     if (d.type === 'child') return 250;
-                    return 220;
+                    return 200;
                 })
-                .strength(0.3) // Weaker links to allow Y constraints to dominate
+                .strength(0.4) // Moderate link strength for balanced layout
             )
             // Repulsion between all nodes to prevent overlap
             .force('charge', d3.forceManyBody()
                 .strength(d => {
                     // Marriage nodes have strong repulsion
-                    if (d.type === 'marriageNode') return -2000;
+                    if (d.type === 'marriageNode') return -2500;
                     // Person nodes have very strong repulsion to prevent overlaps
-                    return -4000;
+                    return -5000;
                 })
             )
-            // Strong Y-axis constraint to keep nodes in generation bands
-            .force('y', d3.forceY(d => d.targetY).strength(0.8)) // Very strong Y constraint
-            // Weak X-axis centering to allow horizontal spread
-            .force('x', d3.forceX(500).strength(0.02)) // Very weak X constraint
-            // Prevent node overlap with collision detection
+            // Gentle centering to keep layout from drifting too far
+            .force('center', d3.forceCenter(500, 400))
+            // Prevent node overlap with massive collision detection
             .force('collision', d3.forceCollide()
                 .radius(d => {
                     // Person nodes need massive space to account for edges and prevent overlaps
-                    if (d.type === 'personNode') return 300;
+                    if (d.type === 'personNode') return 320;
                     // Marriage nodes need significant space too
-                    return 150;
+                    return 160;
                 })
                 .strength(1.0) // Maximum collision strength
-                .iterations(6) // Many collision iterations for better accuracy
+                .iterations(8) // Maximum collision iterations for best accuracy
             )
-            .alphaDecay(0.008) // Very slow cooling for excellent convergence
-            .velocityDecay(0.7); // High friction for stability
+            .alphaDecay(0.005) // Very slow cooling for excellent convergence
+            .velocityDecay(0.75); // High friction for stability
 
         console.log('✅ Simulation created, starting ticks...');
 
         // Run simulation asynchronously
         const ticksPerFrame = 10;
         let tickCount = 0;
-        const maxTicks = 1000; // Many iterations for excellent layout convergence with generation constraints
+        const maxTicks = 1200; // Many iterations for excellent web layout convergence
 
         const tick = () => {
             for (let i = 0; i < ticksPerFrame; i++) {
@@ -561,12 +486,12 @@ const applyWebMode = async (nodes, edges) => {
             }
 
             // Check if simulation has cooled down or reached max iterations
-            if (simulation.alpha() < 0.005 || tickCount >= maxTicks) {
+            if (simulation.alpha() < 0.003 || tickCount >= maxTicks) {
                 simulation.stop();
                 console.log('✅ Simulation complete:', {
                     tickCount,
                     alpha: simulation.alpha(),
-                    reason: simulation.alpha() < 0.005 ? 'converged' : 'max iterations'
+                    reason: simulation.alpha() < 0.003 ? 'converged' : 'max iterations'
                 });
 
                 // Update node positions from simulation
