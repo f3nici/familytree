@@ -17,13 +17,9 @@
             person: '👤',
             male: '♂',
             female: '♀',
-            zoomIn: '+',
-            zoomOut: '−',
-            reset: '⟲',
             list: '☰',
             grid: '⊞',
             eye: '👁',
-            share: '↗',
         };
 
         // Utility Functions
@@ -662,121 +658,15 @@
         // which provides relationship lines, marriage nodes, and auto-organize functionality
         const FluidTreeWithReactFlow = window.FluidTreeWithReactFlow;
 
-        // Strict Tree View - Hierarchical generations view
-        const StrictTreeView = ({ treeData, selectedPerson, onSelectPerson, isEditMode }) => {
-            // Build generation data
-            const generations = useMemo(() => {
-                const people = treeData.people;
-                const marriages = treeData.mariages;
-                const personGenerations = {};
-                const visited = new Set();
-                
-                // Find root people (those who appear as parents but not as children)
-                const childIds = new Set();
-                const parentIds = new Set();
-                
-                marriages.forEach(marriage => {
-                    if (marriage.length >= 2) {
-                        parentIds.add(marriage[0]);
-                        parentIds.add(marriage[1]);
-                        marriage.slice(2).forEach(childId => childIds.add(childId));
-                    }
-                });
-                
-                const rootIds = [...parentIds].filter(id => !childIds.has(id));
-                
-                // If no roots found, use oldest people by birth date
-                if (rootIds.length === 0) {
-                    const sortedByBirth = Object.entries(people).sort((a, b) => {
-                        const birthA = a[1].events?.find(e => e.type === '$_BIRTH')?.dateStart || '9999';
-                        const birthB = b[1].events?.find(e => e.type === '$_BIRTH')?.dateStart || '9999';
-                        return birthA.localeCompare(birthB);
-                    });
-                    if (sortedByBirth.length > 0) {
-                        rootIds.push(sortedByBirth[0][0]);
-                    }
-                }
-                
-                // BFS to assign generations
-                const queue = rootIds.map(id => ({ id, gen: 0 }));
-                
-                while (queue.length > 0) {
-                    const { id, gen } = queue.shift();
-                    if (visited.has(id)) continue;
-                    visited.add(id);
-                    personGenerations[id] = gen;
-                    
-                    // Find children
-                    marriages.forEach(marriage => {
-                        if (marriage.length >= 2 && (marriage[0] === id || marriage[1] === id)) {
-                            // Add spouse at same generation
-                            const spouseId = marriage[0] === id ? marriage[1] : marriage[0];
-                            if (!visited.has(spouseId)) {
-                                queue.push({ id: spouseId, gen });
-                            }
-                            // Add children at next generation
-                            marriage.slice(2).forEach(childId => {
-                                if (!visited.has(childId)) {
-                                    queue.push({ id: childId, gen: gen + 1 });
-                                }
-                            });
-                        }
-                    });
-                }
-                
-                // Add any unvisited people
-                Object.keys(people).forEach(id => {
-                    if (!visited.has(id)) {
-                        personGenerations[id] = 0;
-                    }
-                });
-                
-                // Group by generation
-                const gens = {};
-                Object.entries(personGenerations).forEach(([id, gen]) => {
-                    if (!gens[gen]) gens[gen] = [];
-                    gens[gen].push(id);
-                });
-                
-                return gens;
-            }, [treeData]);
-
-            const generationLabels = ['Grandparents', 'Parents', 'Children', 'Grandchildren', 'Great-grandchildren'];
-
-            return (
-                <div className="tree-strict">
-                    {Object.entries(generations).sort((a, b) => Number(a[0]) - Number(b[0])).map(([gen, peopleIds]) => (
-                        <div key={gen} className="generation-row">
-                            <span className="generation-label">
-                                {generationLabels[Number(gen)] || `Gen ${Number(gen) + 1}`}
-                            </span>
-                            {peopleIds.map(personId => (
-                                <PersonCard 
-                                    key={personId}
-                                    person={treeData.people[personId]}
-                                    personId={personId}
-                                    isSelected={selectedPerson === personId}
-                                    onClick={onSelectPerson}
-                                    isEditMode={isEditMode}
-                                />
-                            ))}
-                        </div>
-                    ))}
-                </div>
-            );
-        };
-
         // Main App Component
         const FamilyTreeApp = () => {
             const [treeData, setTreeData] = useState(null);
             const [isEditMode, setIsEditMode] = useState(true);
-            const [viewMode, setViewMode] = useState('fluid'); // 'fluid' or 'strict'
             const [selectedPerson, setSelectedPerson] = useState(null);
             const [searchQuery, setSearchQuery] = useState('');
             const [showAddPersonModal, setShowAddPersonModal] = useState(false);
             const [showAddMarriageModal, setShowAddMarriageModal] = useState(false);
-            const [zoom, setZoom] = useState(1);
-            
+
             const fileInputRef = useRef(null);
 
             // Filter people based on search
@@ -969,12 +859,6 @@
                 }
             };
 
-            const handleShareLink = () => {
-                // Create a view-only link (would need backend in production)
-                const viewOnlyUrl = window.location.href + '?view=true';
-                navigator.clipboard.writeText(viewOnlyUrl);
-                alert('View-only link copied to clipboard!');
-            };
 
             // Welcome screen if no data loaded
             if (!treeData) {
@@ -1019,36 +903,17 @@
                         </div>
                         
                         <div className="tree-name">{treeData.name}</div>
-                        
+
                         <div className="header-actions">
-                            {/* View Mode Toggle */}
-                            <div className="view-mode-toggle">
-                                <button 
-                                    className={`view-mode-btn ${viewMode === 'fluid' ? 'active' : ''}`}
-                                    onClick={() => setViewMode('fluid')}
-                                >
-                                    Fluid
-                                </button>
-                                <button 
-                                    className={`view-mode-btn ${viewMode === 'strict' ? 'active' : ''}`}
-                                    onClick={() => setViewMode('strict')}
-                                >
-                                    Strict
-                                </button>
-                            </div>
-                            
                             {/* Edit Mode Toggle */}
                             <div className="toggle-container">
                                 <span className="toggle-label">{isEditMode ? 'Edit Mode' : 'View Only'}</span>
-                                <div 
+                                <div
                                     className={`toggle-switch ${isEditMode ? 'active' : ''}`}
                                     onClick={() => setIsEditMode(!isEditMode)}
                                 />
                             </div>
-                            
-                            <button className="btn btn-ghost" onClick={handleShareLink}>
-                                {Icons.share} Share
-                            </button>
+
                             <button className="btn btn-secondary" onClick={handleDownload}>
                                 {Icons.download} Export
                             </button>
@@ -1126,8 +991,7 @@
 
                         {/* Tree Canvas */}
                         <main className="tree-canvas">
-                            {/* Fluid mode: React Flow needs direct container access */}
-                            {viewMode === 'fluid' && Object.keys(treeData.people).length > 0 ? (
+                            {Object.keys(treeData.people).length > 0 ? (
                                 <div style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }}>
                                     <FluidTreeWithReactFlow
                                         treeData={treeData}
@@ -1136,54 +1000,26 @@
                                     />
                                 </div>
                             ) : (
-                                <>
-                                    <div className="tree-viewport" style={{transform: `scale(${zoom})`, transformOrigin: 'top center'}}>
-                                        <div className="tree-content">
-                                            {Object.keys(treeData.people).length === 0 ? (
-                                                <div className="empty-state">
-                                                    <div className="empty-icon">{Icons.tree}</div>
-                                                    <h3 className="empty-title">Start Your Family Tree</h3>
-                                                    <p className="empty-text">
-                                                        Add your first family member to begin building your tree.
-                                                    </p>
-                                                    {isEditMode && (
-                                                        <button
-                                                            className="btn btn-primary"
-                                                            style={{marginTop: '24px'}}
-                                                            onClick={() => setShowAddPersonModal(true)}
-                                                        >
-                                                            {Icons.plus} Add First Person
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <StrictTreeView
-                                                    treeData={treeData}
-                                                    selectedPerson={selectedPerson}
-                                                    onSelectPerson={setSelectedPerson}
-                                                    isEditMode={isEditMode}
-                                                />
+                                <div className="tree-viewport">
+                                    <div className="tree-content">
+                                        <div className="empty-state">
+                                            <div className="empty-icon">{Icons.tree}</div>
+                                            <h3 className="empty-title">Start Your Family Tree</h3>
+                                            <p className="empty-text">
+                                                Add your first family member to begin building your tree.
+                                            </p>
+                                            {isEditMode && (
+                                                <button
+                                                    className="btn btn-primary"
+                                                    style={{marginTop: '24px'}}
+                                                    onClick={() => setShowAddPersonModal(true)}
+                                                >
+                                                    {Icons.plus} Add First Person
+                                                </button>
                                             )}
                                         </div>
                                     </div>
-
-                                    {/* Zoom Controls - only for strict mode */}
-                                    {viewMode !== 'fluid' && (
-                                        <div className="zoom-controls">
-                                            <button className="zoom-btn" onClick={() => setZoom(z => Math.min(z + 0.1, 2))}>
-                                                {Icons.zoomIn}
-                                            </button>
-                                            <div className="zoom-divider" />
-                                            <button className="zoom-btn" onClick={() => setZoom(1)}>
-                                                {Icons.reset}
-                                            </button>
-                                            <div className="zoom-divider" />
-                                            <button className="zoom-btn" onClick={() => setZoom(z => Math.max(z - 0.1, 0.5))}>
-                                                {Icons.zoomOut}
-                                            </button>
-                                        </div>
-                                    )}
-                                </>
+                                </div>
                             )}
                         </main>
 
