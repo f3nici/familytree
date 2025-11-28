@@ -433,51 +433,51 @@ const applyWebMode = async (nodes, edges) => {
 
         console.log('🔧 Creating d3 simulation with', simNodes.length, 'nodes and', simLinks.length, 'links');
 
-        // Configure d3-force simulation for natural web-like layout
+        // Configure d3-force simulation for compact web layout
         const simulation = d3.forceSimulation(simNodes)
             // Attraction between connected nodes
             .force('link', d3.forceLink(simLinks)
                 .id(d => d.id)
                 .distance(d => {
-                    // Marriage edges: parents close to marriage node
-                    if (d.type === 'marriage') return 180;
-                    // Child edges: marriage node to children
-                    if (d.type === 'child') return 250;
-                    return 200;
+                    // Marriage edges: parents close to marriage node (compact spacing)
+                    if (d.type === 'marriage') return 120;
+                    // Child edges: marriage node to children (compact spacing)
+                    if (d.type === 'child') return 180;
+                    return 140;
                 })
-                .strength(0.4) // Moderate link strength for balanced layout
+                .strength(0.6) // Stronger links to keep connected nodes closer
             )
             // Repulsion between all nodes to prevent overlap
             .force('charge', d3.forceManyBody()
                 .strength(d => {
-                    // Marriage nodes have strong repulsion
-                    if (d.type === 'marriageNode') return -2500;
-                    // Person nodes have very strong repulsion to prevent overlaps
-                    return -5000;
+                    // Marriage nodes with moderate repulsion
+                    if (d.type === 'marriageNode') return -800;
+                    // Person nodes with strong but not excessive repulsion
+                    return -1800;
                 })
             )
             // Gentle centering to keep layout from drifting too far
             .force('center', d3.forceCenter(500, 400))
-            // Prevent node overlap with massive collision detection
+            // Prevent node overlap with collision detection
             .force('collision', d3.forceCollide()
                 .radius(d => {
-                    // Person nodes need massive space to account for edges and prevent overlaps
-                    if (d.type === 'personNode') return 320;
-                    // Marriage nodes need significant space too
-                    return 160;
+                    // Person nodes need space to prevent overlap but not excessive
+                    if (d.type === 'personNode') return 200;
+                    // Marriage nodes are smaller
+                    return 90;
                 })
-                .strength(1.0) // Maximum collision strength
-                .iterations(8) // Maximum collision iterations for best accuracy
+                .strength(0.95) // Strong collision to prevent overlaps
+                .iterations(5) // Good collision accuracy
             )
-            .alphaDecay(0.005) // Very slow cooling for excellent convergence
-            .velocityDecay(0.75); // High friction for stability
+            .alphaDecay(0.01) // Moderate cooling for good convergence
+            .velocityDecay(0.6); // Moderate friction
 
         console.log('✅ Simulation created, starting ticks...');
 
         // Run simulation asynchronously
         const ticksPerFrame = 10;
         let tickCount = 0;
-        const maxTicks = 1200; // Many iterations for excellent web layout convergence
+        const maxTicks = 600; // Moderate iterations for compact layout
 
         const tick = () => {
             for (let i = 0; i < ticksPerFrame; i++) {
@@ -486,12 +486,12 @@ const applyWebMode = async (nodes, edges) => {
             }
 
             // Check if simulation has cooled down or reached max iterations
-            if (simulation.alpha() < 0.003 || tickCount >= maxTicks) {
+            if (simulation.alpha() < 0.01 || tickCount >= maxTicks) {
                 simulation.stop();
                 console.log('✅ Simulation complete:', {
                     tickCount,
                     alpha: simulation.alpha(),
-                    reason: simulation.alpha() < 0.003 ? 'converged' : 'max iterations'
+                    reason: simulation.alpha() < 0.01 ? 'converged' : 'max iterations'
                 });
 
                 // Update node positions from simulation
