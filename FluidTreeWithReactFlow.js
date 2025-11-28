@@ -414,6 +414,54 @@ const applyWebMode = async (nodes, edges) => {
         // Create a copy of nodes to avoid mutation
         const nodesCopy = nodes.map(n => ({ ...n }));
 
+        // Build relationship maps to understand family structure
+        const marriageToSpouses = new Map(); // marriage node -> [spouse1, spouse2]
+        const marriageToChildren = new Map(); // marriage node -> [child1, child2, ...]
+        const personToSpouse = new Map(); // person -> spouse (via marriage)
+        const personToSiblings = new Map(); // person -> [siblings]
+
+        edges.forEach(edge => {
+            if (edge.data?.type === 'marriage') {
+                const marriageId = edge.target;
+                const parentId = edge.source;
+
+                if (!marriageToSpouses.has(marriageId)) {
+                    marriageToSpouses.set(marriageId, []);
+                }
+                marriageToSpouses.get(marriageId).push(parentId);
+            } else if (edge.data?.type === 'child') {
+                const marriageId = edge.source;
+                const childId = edge.target;
+
+                if (!marriageToChildren.has(marriageId)) {
+                    marriageToChildren.set(marriageId, []);
+                }
+                marriageToChildren.get(marriageId).push(childId);
+            }
+        });
+
+        // Build spouse relationships (people married to each other)
+        marriageToSpouses.forEach((spouses, marriageId) => {
+            if (spouses.length === 2) {
+                personToSpouse.set(spouses[0], spouses[1]);
+                personToSpouse.set(spouses[1], spouses[0]);
+            }
+        });
+
+        // Build sibling relationships
+        marriageToChildren.forEach((children, marriageId) => {
+            children.forEach(child => {
+                const siblings = children.filter(c => c !== child);
+                personToSiblings.set(child, siblings);
+            });
+        });
+
+        console.log('👥 Relationship maps built:', {
+            marriages: marriageToSpouses.size,
+            spousePairs: personToSpouse.size / 2,
+            siblingGroups: marriageToChildren.size
+        });
+
         // Create simulation nodes with initial positions
         const simNodes = nodesCopy.map(node => ({
             id: node.id,
@@ -469,6 +517,67 @@ const applyWebMode = async (nodes, edges) => {
                 .strength(0.95) // Strong collision to prevent overlaps
                 .iterations(5) // Good collision accuracy
             )
+            // CUSTOM FORCE: Align spouses horizontally (similar Y values)
+            .force('spouseAlignment', () => {
+                simNodes.forEach(node => {
+                    if (node.type === 'personNode') {
+                        const spouseId = personToSpouse.get(node.id);
+                        if (spouseId) {
+                            const spouse = simNodes.find(n => n.id === spouseId);
+                            if (spouse) {
+                                // Pull spouses toward same Y coordinate
+                                const avgY = (node.y + spouse.y) / 2;
+                                const force = (avgY - node.y) * 0.1; // Moderate strength
+                                node.vy += force;
+                            }
+                        }
+                    }
+                });
+            })
+            // CUSTOM FORCE: Group siblings together in X direction
+            .force('siblingGrouping', () => {
+                simNodes.forEach(node => {
+                    if (node.type === 'personNode') {
+                        const siblings = personToSiblings.get(node.id);
+                        if (siblings && siblings.length > 0) {
+                            // Find sibling nodes
+                            const siblingNodes = siblings
+                                .map(sibId => simNodes.find(n => n.id === sibId))
+                                .filter(n => n);
+
+                            if (siblingNodes.length > 0) {
+                                // Calculate average X of siblings
+                                const avgX = siblingNodes.reduce((sum, sib) => sum + sib.x, 0) / siblingNodes.length;
+                                // Weak pull toward average X to group siblings
+                                const force = (avgX - node.x) * 0.05; // Weak strength to avoid forcing overlap
+                                node.vx += force;
+                            }
+                        }
+                    }
+                });
+            })
+            // CUSTOM FORCE: Position marriage nodes at midpoint Y of spouses
+            .force('marriageMidpoint', () => {
+                marriageToSpouses.forEach((spouses, marriageId) => {
+                    if (spouses.length === 2) {
+                        const spouse1 = simNodes.find(n => n.id === spouses[0]);
+                        const spouse2 = simNodes.find(n => n.id === spouses[1]);
+                        const marriageNode = simNodes.find(n => n.id === marriageId);
+
+                        if (spouse1 && spouse2 && marriageNode) {
+                            // Position marriage node at midpoint Y of spouses
+                            const targetY = (spouse1.y + spouse2.y) / 2;
+                            const force = (targetY - marriageNode.y) * 0.15;
+                            marriageNode.vy += force;
+
+                            // Also pull marriage node toward midpoint X
+                            const targetX = (spouse1.x + spouse2.x) / 2;
+                            const forceX = (targetX - marriageNode.x) * 0.15;
+                            marriageNode.vx += forceX;
+                        }
+                    }
+                });
+            })
             .alphaDecay(0.01) // Moderate cooling for good convergence
             .velocityDecay(0.6); // Moderate friction
 
