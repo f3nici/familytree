@@ -1,47 +1,156 @@
-# Family Roots
+# `familytree`
 
-Family Roots is a single-page React app for building and exploring interactive family trees directly in the browser. It supports remarriages, half-siblings, and other complex relationships while keeping your data on your device via local storage.
+**familytree** is a browser-based visual family tree builder inspired by FamilyBushes. It renders clean relationship maps, supports fluid layouts, and handles complex structures like remarriages, step-families and half-siblings. Trees are stored as JSON and can be imported and exported freely.
+
+This tool must be **served over HTTP** because browsers block module loading when opened via `file://`.
+
+---
 
 ## Features
 
-- Create new trees and persist them locally in the browser.
-- Add people with birth/death details, genders, and custom attributes.
-- Build relationships that include spouses, parents, children, remarriages, and half-siblings.
-- Toggle edit/view modes to protect data when sharing or presenting.
-- Import and export tree data as formatted JSON files for backup or sharing.
-- Search the member list to quickly jump to any person in the tree.
-- Share a view-only link generated from the current tree data.
+* Create and edit full family trees
+* Supports remarriages, step relations and blended families
+* Fluid map layout that visually arranges families
+* JSON import and export
+* Compatible with **FamilyBushes JSON format**
+* View-only and editable modes
+* Entirely browser-based with no backend
+* Lightweight and fast
 
-## Project structure
+---
 
-- `family_tree_app.html` – HTML shell that loads React from a CDN and mounts the app.
-- `app.js` – All React components, state management, and interaction logic.
-- `styles.css` – Layout and visual design for the tree, lists, and controls.
+## Demo / Hosting
 
-## Running locally
+You must **host the project** or run it under a local web server. Opening `index.html` directly from your computer will not work due to browser restrictions.
 
-This project has no build step. Open `family_tree_app.html` in a modern browser, or serve the folder with a simple HTTP server:
+Recommended hosting:
+
+* GitHub Pages
+* Netlify
+* Vercel
+* Cloudflare Pages
+* Any static host
+
+---
+
+## Running Locally
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/f3nici/familytree.git
+cd familytree
+```
+
+### 2. Start a local server
+
+Python:
 
 ```bash
 python -m http.server 8000
 ```
 
-Then visit [http://localhost:8000/family_tree_app.html](http://localhost:8000/family_tree_app.html).
+Node:
 
-## Importing and exporting data
+```bash
+npx serve .
+```
 
-- **Export**: Use the **Export** button in the header to download the current tree as a JSON file.
-- **Import**: Use the **Import** button (or the welcome screen) to load a JSON file you previously exported.
+Open:
 
-## Editing the tree
+```
+http://localhost:8000
+```
 
-1. Click **Create New Tree** on the welcome screen, or import an existing JSON export.
-2. Use **Edit Mode** to add family members, set genders, and fill in birth/death events.
-3. Add relationships via the **Add Person** and **Add Marriage** actions in the sidebar when edit mode is on.
-4. Switch to **View Only** to prevent accidental changes while browsing or sharing.
+---
 
-All changes are automatically saved to `localStorage` in your browser.
+## Usage
 
-## Sharing
+### Creating a new tree
 
-Use the **Share** button in the header to copy a URL that encodes the current tree data. Send the link to others so they can explore your tree without editing it.
+* Open the hosted site
+* Select “New Tree”
+* Add people and define their family connections
+
+### Importing a tree (FamilyBushes compatible)
+
+The JSON format used by this project is **the same format used by FamilyBushes**.
+To import a FamilyBushes tree:
+
+1. In FamilyBushes, click **Export**
+2. You will get a file ending in `.FBFT`
+3. Use **7zip** (or any unzip tool) to extract it
+4. Inside the extracted folder you will find a JSON file
+5. Import that JSON into this project
+
+### Exporting
+
+* Click **Export**
+* Saves a `.json` file compatible with this project and FamilyBushes
+
+### Navigation
+
+* Drag to move around
+* Scroll to zoom
+* Click a person to view or edit their details
+
+---
+
+## JSON Format
+
+This project uses the **same structure as FamilyBushes**.
+
+Example:
+
+```json
+{
+  "people": [
+    {
+      "id": 1,
+      "name": "John Smith",
+      "gender": "male",
+      "parents": [],
+      "spouses": [2],
+      "children": [3]
+    }
+  ]
+}
+```
+
+IDs reference relationships across the tree.
+
+---
+
+## Deploying to GitHub Pages
+
+1. Push the repository to GitHub
+2. Go to `Settings → Pages`
+3. Choose **Deploy from branch**
+4. Select your branch and the root folder
+5. GitHub Pages will publish your site
+6. Visit:
+
+   ```
+   https://<username>.github.io/familytree
+   ```
+
+---
+
+## Future Enhancements
+
+* Auto-organised layout with no line collisions
+* More advanced relationship edge rendering
+* Attachments for profiles (images, docs)
+* GEDCOM import
+* Sharing via URL encoding
+* Full component-based refactor version
+
+---
+
+## Contributing
+
+Pull requests are welcome. For large changes:
+
+* Open an issue
+* Describe the improvement
+* Submit a PR with clear commit descriptions
