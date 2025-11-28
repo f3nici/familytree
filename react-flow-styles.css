@@ -150,9 +150,12 @@
     opacity: 0; /* Hidden by default */
 }
 
-/* Hide handles on person nodes completely */
+/* Hide handles on person nodes visually but keep them in DOM for edge connections */
 .react-flow-person-node .react-flow-handle {
-    display: none !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    width: 1px !important;
+    height: 1px !important;
 }
 
 /* Only show handles on marriage nodes when hovering */
