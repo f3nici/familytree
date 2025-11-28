@@ -133,7 +133,7 @@ const MarriageNode = ({ selected }) => {
 };
 
 // ==========================================
-// CUSTOM FLUID EDGE - Smooth Curved Lines
+// CUSTOM FLUID EDGE - Straight Lines for Force-Directed Layout
 // ==========================================
 const FluidEdge = ({
     id,
@@ -145,45 +145,49 @@ const FluidEdge = ({
     targetPosition,
     style = {},
     data = {},
-    markerEnd
+    markerEnd,
+    source,
+    target
 }) => {
-    // Calculate control points for smooth Bezier curve
-    // This creates the characteristic "S" or vertical curve seen in familybushes.com
+    // For force-directed layout, draw straight lines from center to center
+    // sourceX, sourceY, targetX, targetY are handle positions
+    // We need to adjust to node centers
 
-    const verticalDistance = Math.abs(targetY - sourceY);
-    const controlOffset = verticalDistance * 0.5; // 50% of vertical distance
+    // Node dimensions
+    const personNodeHeight = 140;
+    const personNodeWidth = 180;
+    const marriageNodeSize = 20;
 
-    let path;
+    // Determine node types from the data or IDs
+    const isSourceMarriage = source?.includes('marriage') || false;
+    const isTargetMarriage = target?.includes('marriage') || false;
 
-    if (sourcePosition === Position.Bottom && targetPosition === Position.Top) {
-        // Parent to child or marriage connection (downward)
-        // Control points create smooth vertical curve
-        const cp1x = sourceX;
-        const cp1y = sourceY + controlOffset;
-        const cp2x = targetX;
-        const cp2y = targetY - controlOffset;
+    // Adjust source position to center
+    let adjustedSourceX = sourceX;
+    let adjustedSourceY = sourceY;
 
-        path = `M ${sourceX},${sourceY} C ${cp1x},${cp1y} ${cp2x},${cp2y} ${targetX},${targetY}`;
-    } else if (sourcePosition === Position.Top && targetPosition === Position.Bottom) {
-        // Child to parent (upward) - rare but possible
-        const cp1x = sourceX;
-        const cp1y = sourceY - controlOffset;
-        const cp2x = targetX;
-        const cp2y = targetY + controlOffset;
-
-        path = `M ${sourceX},${sourceY} C ${cp1x},${cp1y} ${cp2x},${cp2y} ${targetX},${targetY}`;
-    } else {
-        // Fallback to bezier path for other directions
-        const [edgePath] = getBezierPath({
-            sourceX,
-            sourceY,
-            sourcePosition,
-            targetX,
-            targetY,
-            targetPosition,
-        });
-        path = edgePath;
+    if (sourcePosition === Position.Bottom) {
+        // Handle is at bottom, move up to center
+        adjustedSourceY = sourceY - (isSourceMarriage ? marriageNodeSize / 2 : personNodeHeight / 2);
+    } else if (sourcePosition === Position.Top) {
+        // Handle is at top, move down to center
+        adjustedSourceY = sourceY + (isSourceMarriage ? marriageNodeSize / 2 : personNodeHeight / 2);
     }
+
+    // Adjust target position to center
+    let adjustedTargetX = targetX;
+    let adjustedTargetY = targetY;
+
+    if (targetPosition === Position.Bottom) {
+        // Handle is at bottom, move up to center
+        adjustedTargetY = targetY - (isTargetMarriage ? marriageNodeSize / 2 : personNodeHeight / 2);
+    } else if (targetPosition === Position.Top) {
+        // Handle is at top, move down to center
+        adjustedTargetY = targetY + (isTargetMarriage ? marriageNodeSize / 2 : personNodeHeight / 2);
+    }
+
+    // Draw straight line from center to center
+    const path = `M ${adjustedSourceX},${adjustedSourceY} L ${adjustedTargetX},${adjustedTargetY}`;
 
     // Determine if this is a marriage edge (parent to marriage) or child edge (marriage to child)
     const isMarriageEdge = data.type === 'marriage';
