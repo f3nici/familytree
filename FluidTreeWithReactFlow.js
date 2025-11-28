@@ -380,7 +380,7 @@ const calculateFluidLayout = (treeData) => {
 };
 
 // ==========================================
-// FORCE-DIRECTED AUTO-ORGANIZE FUNCTION
+// WEB MODE FUNCTION
 // ==========================================
 /**
  * Repositions existing nodes using d3-force for a spider-web layout
@@ -388,9 +388,9 @@ const calculateFluidLayout = (treeData) => {
  * @param {Array} edges - Current React Flow edges
  * @returns {Promise<Array>} Updated nodes with new positions
  */
-const autoOrganiseWithForce = async (nodes, edges) => {
+const applyWebMode = async (nodes, edges) => {
     return new Promise((resolve, reject) => {
-        console.log('🔧 autoOrganiseWithForce called with:', {
+        console.log('🔧 applyWebMode called with:', {
             nodesCount: nodes?.length,
             edgesCount: edges?.length,
             d3Available: typeof d3 !== 'undefined',
@@ -419,7 +419,7 @@ const autoOrganiseWithForce = async (nodes, edges) => {
             id: node.id,
             x: node.position.x + 90, // Center of node (nodeWidth/2)
             y: node.position.y + 70, // Center of node (nodeHeight/2)
-            fx: null, // Allow movement
+            fx: null, // Allow free movement
             fy: null,
             type: node.type
         }));
@@ -433,50 +433,51 @@ const autoOrganiseWithForce = async (nodes, edges) => {
 
         console.log('🔧 Creating d3 simulation with', simNodes.length, 'nodes and', simLinks.length, 'links');
 
-        // Configure d3-force simulation
+        // Configure d3-force simulation for compact web layout
         const simulation = d3.forceSimulation(simNodes)
             // Attraction between connected nodes
             .force('link', d3.forceLink(simLinks)
                 .id(d => d.id)
                 .distance(d => {
-                    // Marriage edges: parents close to marriage node
+                    // Marriage edges: parents close to marriage node (compact spacing)
                     if (d.type === 'marriage') return 120;
-                    // Child edges: marriage node to children
-                    if (d.type === 'child') return 200;
-                    return 150;
+                    // Child edges: marriage node to children (compact spacing)
+                    if (d.type === 'child') return 180;
+                    return 140;
                 })
-                .strength(0.7)
+                .strength(0.6) // Stronger links to keep connected nodes closer
             )
             // Repulsion between all nodes to prevent overlap
             .force('charge', d3.forceManyBody()
                 .strength(d => {
-                    // Marriage nodes have less repulsion
-                    if (d.type === 'marriageNode') return -500;
-                    // Person nodes have more repulsion
-                    return -1200;
+                    // Marriage nodes with moderate repulsion
+                    if (d.type === 'marriageNode') return -800;
+                    // Person nodes with strong but not excessive repulsion
+                    return -1800;
                 })
             )
-            // Pull toward center to keep layout compact
+            // Gentle centering to keep layout from drifting too far
             .force('center', d3.forceCenter(500, 400))
             // Prevent node overlap with collision detection
             .force('collision', d3.forceCollide()
                 .radius(d => {
-                    // Person nodes need more space
-                    if (d.type === 'personNode') return 130;
+                    // Person nodes need space to prevent overlap but not excessive
+                    if (d.type === 'personNode') return 200;
                     // Marriage nodes are smaller
-                    return 40;
+                    return 90;
                 })
-                .strength(0.9)
+                .strength(0.95) // Strong collision to prevent overlaps
+                .iterations(5) // Good collision accuracy
             )
-            .alphaDecay(0.02) // Slower cooling for better convergence
-            .velocityDecay(0.4); // More friction for stability
+            .alphaDecay(0.01) // Moderate cooling for good convergence
+            .velocityDecay(0.6); // Moderate friction
 
         console.log('✅ Simulation created, starting ticks...');
 
         // Run simulation asynchronously
         const ticksPerFrame = 10;
         let tickCount = 0;
-        const maxTicks = 300;
+        const maxTicks = 600; // Moderate iterations for compact layout
 
         const tick = () => {
             for (let i = 0; i < ticksPerFrame; i++) {
@@ -523,27 +524,27 @@ const autoOrganiseWithForce = async (nodes, edges) => {
 // ==========================================
 const FluidTreeControls = ({ nodes, edges, setNodes }) => {
     const { fitView } = useReactFlow();
-    const [isOrganizing, setIsOrganizing] = React.useState(false);
+    const [isApplyingWebMode, setIsApplyingWebMode] = React.useState(false);
 
-    const handleAutoOrganize = async () => {
-        console.log('🎯 Auto-Organize button clicked!', {
-            isOrganizing,
+    const handleWebMode = async () => {
+        console.log('🎯 Web Mode button clicked!', {
+            isApplyingWebMode,
             nodesCount: nodes?.length,
             edgesCount: edges?.length
         });
 
-        if (isOrganizing || !nodes || nodes.length === 0) {
-            console.log('⚠️ Aborting: isOrganizing=' + isOrganizing + ', nodes=' + nodes?.length);
+        if (isApplyingWebMode || !nodes || nodes.length === 0) {
+            console.log('⚠️ Aborting: isApplyingWebMode=' + isApplyingWebMode + ', nodes=' + nodes?.length);
             return;
         }
 
-        setIsOrganizing(true);
-        console.log('✅ Starting organization...');
+        setIsApplyingWebMode(true);
+        console.log('✅ Starting Web Mode...');
 
         try {
             // Run force-directed layout
-            const organizedNodes = await autoOrganiseWithForce(nodes, edges);
-            console.log('✅ Organization complete, updating nodes...');
+            const organizedNodes = await applyWebMode(nodes, edges);
+            console.log('✅ Web Mode complete, updating nodes...');
 
             // Update nodes with new positions
             setNodes(organizedNodes);
@@ -557,9 +558,9 @@ const FluidTreeControls = ({ nodes, edges, setNodes }) => {
                 });
             }, 100);
         } catch (error) {
-            console.error('Error during auto-organize:', error);
+            console.error('Error during Web Mode:', error);
         } finally {
-            setIsOrganizing(false);
+            setIsApplyingWebMode(false);
         }
     };
 
@@ -567,12 +568,12 @@ const FluidTreeControls = ({ nodes, edges, setNodes }) => {
         <div className="fluid-tree-controls">
             <button
                 className="organize-btn"
-                onClick={handleAutoOrganize}
-                disabled={isOrganizing}
-                title="Auto-organize nodes using force-directed layout"
+                onClick={handleWebMode}
+                disabled={isApplyingWebMode}
+                title="Apply Web Mode using force-directed layout"
             >
-                <span className="organize-icon">{isOrganizing ? '⏳' : '⚡'}</span>
-                <span className="organize-text">{isOrganizing ? 'Organizing...' : 'Auto-Organize'}</span>
+                <span className="organize-icon">{isApplyingWebMode ? '⏳' : '🕸️'}</span>
+                <span className="organize-text">{isApplyingWebMode ? 'Applying...' : 'Web Mode'}</span>
             </button>
         </div>
     );
@@ -598,18 +599,38 @@ const FluidTreeInner = ({ treeData, selectedPerson, onSelectPerson }) => {
 
     // Track the previous treeData to only reset when it actually changes
     const prevTreeDataRef = React.useRef(treeData);
+    const { fitView } = useReactFlow();
 
     // Update nodes and edges when treeData changes (person added/removed/modified)
     React.useEffect(() => {
         // Only recalculate if treeData actually changed (not just a re-render)
         if (prevTreeDataRef.current !== treeData) {
-            console.log('🔄 TreeData changed, recalculating layout');
+            console.log('🔄 TreeData changed, recalculating layout and applying Web Mode');
             const { nodes: newNodes, edges: newEdges } = calculateFluidLayout(treeData);
             setNodes(newNodes);
             setEdges(newEdges);
             prevTreeDataRef.current = treeData;
+
+            // Automatically apply Web Mode after layout calculation
+            setTimeout(async () => {
+                try {
+                    const organizedNodes = await applyWebMode(newNodes, newEdges);
+                    setNodes(organizedNodes);
+
+                    // Fit view after Web Mode
+                    setTimeout(() => {
+                        fitView({
+                            padding: 0.2,
+                            duration: 800,
+                            maxZoom: 1.5
+                        });
+                    }, 100);
+                } catch (error) {
+                    console.error('Error during auto Web Mode:', error);
+                }
+            }, 50);
         }
-    }, [treeData, setNodes, setEdges]);
+    }, [treeData, setNodes, setEdges, fitView]);
 
     // Define custom node types
     const nodeTypes = React.useMemo(() => ({
