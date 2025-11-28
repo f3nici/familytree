@@ -376,6 +376,145 @@ const calculateFluidLayout = (treeData) => {
 };
 
 // ==========================================
+// FORCE-DIRECTED AUTO-ORGANIZE FUNCTION
+// ==========================================
+/**
+ * Repositions existing nodes using d3-force for a spider-web layout
+ * @param {Array} nodes - Current React Flow nodes
+ * @param {Array} edges - Current React Flow edges
+ * @returns {Promise<Array>} Updated nodes with new positions
+ */
+const autoOrganiseWithForce = async (nodes, edges) => {
+    return new Promise((resolve, reject) => {
+        console.log('🔧 autoOrganiseWithForce called with:', {
+            nodesCount: nodes?.length,
+            edgesCount: edges?.length,
+            d3Available: typeof d3 !== 'undefined',
+            d3Functions: typeof d3 !== 'undefined' ? Object.keys(d3).slice(0, 10) : 'N/A'
+        });
+
+        // Check if d3-force is available
+        if (typeof d3 === 'undefined') {
+            console.error('❌ d3-force library not loaded!');
+            reject(new Error('d3-force library not available'));
+            return;
+        }
+
+        // Don't modify if there are no nodes
+        if (!nodes || nodes.length === 0) {
+            console.log('⚠️ No nodes to organize');
+            resolve(nodes);
+            return;
+        }
+
+        // Create a copy of nodes to avoid mutation
+        const nodesCopy = nodes.map(n => ({ ...n }));
+
+        // Create simulation nodes with initial positions
+        const simNodes = nodesCopy.map(node => ({
+            id: node.id,
+            x: node.position.x + 90, // Center of node (nodeWidth/2)
+            y: node.position.y + 70, // Center of node (nodeHeight/2)
+            fx: null, // Allow movement
+            fy: null,
+            type: node.type
+        }));
+
+        // Create simulation links from edges
+        const simLinks = edges.map(edge => ({
+            source: edge.source,
+            target: edge.target,
+            type: edge.data?.type || 'unknown'
+        }));
+
+        console.log('🔧 Creating d3 simulation with', simNodes.length, 'nodes and', simLinks.length, 'links');
+
+        // Configure d3-force simulation
+        const simulation = d3.forceSimulation(simNodes)
+            // Attraction between connected nodes
+            .force('link', d3.forceLink(simLinks)
+                .id(d => d.id)
+                .distance(d => {
+                    // Marriage edges: parents close to marriage node
+                    if (d.type === 'marriage') return 120;
+                    // Child edges: marriage node to children
+                    if (d.type === 'child') return 200;
+                    return 150;
+                })
+                .strength(0.7)
+            )
+            // Repulsion between all nodes to prevent overlap
+            .force('charge', d3.forceManyBody()
+                .strength(d => {
+                    // Marriage nodes have less repulsion
+                    if (d.type === 'marriageNode') return -500;
+                    // Person nodes have more repulsion
+                    return -1200;
+                })
+            )
+            // Pull toward center to keep layout compact
+            .force('center', d3.forceCenter(500, 400))
+            // Prevent node overlap with collision detection
+            .force('collision', d3.forceCollide()
+                .radius(d => {
+                    // Person nodes need more space
+                    if (d.type === 'personNode') return 130;
+                    // Marriage nodes are smaller
+                    return 40;
+                })
+                .strength(0.9)
+            )
+            .alphaDecay(0.02) // Slower cooling for better convergence
+            .velocityDecay(0.4); // More friction for stability
+
+        console.log('✅ Simulation created, starting ticks...');
+
+        // Run simulation asynchronously
+        const ticksPerFrame = 10;
+        let tickCount = 0;
+        const maxTicks = 300;
+
+        const tick = () => {
+            for (let i = 0; i < ticksPerFrame; i++) {
+                simulation.tick();
+                tickCount++;
+            }
+
+            // Check if simulation has cooled down or reached max iterations
+            if (simulation.alpha() < 0.01 || tickCount >= maxTicks) {
+                simulation.stop();
+                console.log('✅ Simulation complete:', {
+                    tickCount,
+                    alpha: simulation.alpha(),
+                    reason: simulation.alpha() < 0.01 ? 'converged' : 'max iterations'
+                });
+
+                // Update node positions from simulation
+                nodesCopy.forEach(node => {
+                    const simNode = simNodes.find(n => n.id === node.id);
+                    if (simNode) {
+                        // Convert back from center position to top-left corner
+                        node.position = {
+                            x: simNode.x - 90,
+                            y: simNode.y - 70
+                        };
+                    }
+                });
+
+                console.log('✅ Node positions updated, resolving with', nodesCopy.length, 'nodes');
+                resolve(nodesCopy);
+            } else {
+                // Continue simulation in next frame
+                requestAnimationFrame(tick);
+            }
+        };
+
+        // Start the simulation
+        requestAnimationFrame(tick);
+    });
+};
+
+// ==========================================
 // CONTROLS COMPONENT - Inside ReactFlow Context
 // ==========================================
 const FluidTreeControls = ({ nodes, edges, setNodes }) => {
