@@ -378,15 +378,46 @@ const calculateFluidLayout = (treeData) => {
 // ==========================================
 // CONTROLS COMPONENT - Inside ReactFlow Context
 // ==========================================
-const FluidTreeControls = ({ onResetLayout }) => {
-    const { fitView, zoomIn, zoomOut } = useReactFlow();
+const FluidTreeControls = ({ nodes, edges, setNodes }) => {
+    const { fitView } = useReactFlow();
+    const [isOrganizing, setIsOrganizing] = React.useState(false);
 
-    const handleAutoOrganize = () => {
-        fitView({
-            padding: 0.2,
-            duration: 800,
-            maxZoom: 1
+    const handleAutoOrganize = async () => {
+        console.log('🎯 Auto-Organize button clicked!', {
+            isOrganizing,
+            nodesCount: nodes?.length,
+            edgesCount: edges?.length
         });
+
+        if (isOrganizing || !nodes || nodes.length === 0) {
+            console.log('⚠️ Aborting: isOrganizing=' + isOrganizing + ', nodes=' + nodes?.length);
+            return;
+        }
+
+        setIsOrganizing(true);
+        console.log('✅ Starting organization...');
+
+        try {
+            // Run force-directed layout
+            const organizedNodes = await autoOrganiseWithForce(nodes, edges);
+            console.log('✅ Organization complete, updating nodes...');
+
+            // Update nodes with new positions
+            setNodes(organizedNodes);
+
+            // Fit view after organizing
+            setTimeout(() => {
+                fitView({
+                    padding: 0.2,
+                    duration: 800,
+                    maxZoom: 1.5
+                });
+            }, 100);
+        } catch (error) {
+            console.error('Error during auto-organize:', error);
+        } finally {
+            setIsOrganizing(false);
+        }
     };
 
     return (
@@ -394,18 +425,11 @@ const FluidTreeControls = ({ onResetLayout }) => {
             <button
                 className="organize-btn"
                 onClick={handleAutoOrganize}
-                title="Auto-organize and fit all nodes into view"
+                disabled={isOrganizing}
+                title="Auto-organize nodes using force-directed layout"
             >
-                <span className="organize-icon">⚡</span>
-                <span className="organize-text">Auto-Organize</span>
-            </button>
-            <div className="control-divider"></div>
-            <button
-                className="organize-btn-small"
-                onClick={onResetLayout}
-                title="Reset layout to original positions"
-            >
-                ↻ Reset
+                <span className="organize-icon">{isOrganizing ? '⏳' : '⚡'}</span>
+                <span className="organize-text">{isOrganizing ? 'Organizing...' : 'Auto-Organize'}</span>
             </button>
         </div>
     );
@@ -429,11 +453,19 @@ const FluidTreeInner = ({ treeData, selectedPerson, onSelectPerson }) => {
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-    // Update nodes and edges when treeData changes
+    // Track the previous treeData to only reset when it actually changes
+    const prevTreeDataRef = React.useRef(treeData);
+
+    // Update nodes and edges when treeData changes (person added/removed/modified)
     React.useEffect(() => {
-        const { nodes: newNodes, edges: newEdges } = calculateFluidLayout(treeData);
-        setNodes(newNodes);
-        setEdges(newEdges);
+        // Only recalculate if treeData actually changed (not just a re-render)
+        if (prevTreeDataRef.current !== treeData) {
+            console.log('🔄 TreeData changed, recalculating layout');
+            const { nodes: newNodes, edges: newEdges } = calculateFluidLayout(treeData);
+            setNodes(newNodes);
+            setEdges(newEdges);
+            prevTreeDataRef.current = treeData;
+        }
     }, [treeData, setNodes, setEdges]);
 
     // Define custom node types
@@ -453,21 +485,6 @@ const FluidTreeInner = ({ treeData, selectedPerson, onSelectPerson }) => {
             onSelectPerson(node.data.personId);
         }
     }, [onSelectPerson]);
-
-    // Reset layout to initial positions
-    const handleResetLayout = React.useCallback(() => {
-        const { nodes: newNodes, edges: newEdges } = calculateFluidLayout(treeData);
-        setNodes(newNodes);
-        setEdges(newEdges);
-
-        // Fit view after resetting
-        setTimeout(() => {
-            const { fitView } = useReactFlow;
-            if (fitView) {
-                fitView({ padding: 0.2, duration: 800 });
-            }
-        }, 100);
-    }, [treeData, setNodes, setEdges]);
 
     return (
         <>
@@ -489,7 +506,7 @@ const FluidTreeInner = ({ treeData, selectedPerson, onSelectPerson }) => {
             >
                 <Background color="#e5ddd2" gap={20} size={1} />
             </ReactFlow>
-            <FluidTreeControls onResetLayout={handleResetLayout} />
+            <FluidTreeControls nodes={nodes} edges={edges} setNodes={setNodes} />
         </>
     );
 };
