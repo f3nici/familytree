@@ -647,6 +647,16 @@ const FluidTreeInner = ({ treeData, selectedPerson, onSelectPerson, getNodePosit
         }
     }, [nodes, getNodePositionsRef]);
 
+    // Update nodes when selectedPerson changes to mark the selected node
+    React.useEffect(() => {
+        setNodes(currentNodes =>
+            currentNodes.map(node => ({
+                ...node,
+                selected: node.id === selectedPerson
+            }))
+        );
+    }, [selectedPerson, setNodes]);
+
     // Update edges when selectedPerson changes to inject selectedPerson into edge data
     React.useEffect(() => {
         setEdges(currentEdges =>
