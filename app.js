@@ -1171,7 +1171,7 @@
                 return (
                     <div className="app-container">
                         <div className="welcome-screen">
-                            <div className="logo-icon" style={{width: '120px', height: '120px', marginBottom: '24px'}}>
+                            <div className="logo-icon" style={{width: '80px', height: '80px', marginBottom: '24px', background: 'none', borderRadius: '0'}}>
                                 <img src="assets/logo.png" alt="Family Webs" style={{width: '100%', height: '100%', objectFit: 'contain'}} />
                             </div>
                             <h1 className="welcome-title">Family Webs</h1>
@@ -1204,7 +1204,7 @@
                     {/* Header */}
                     <header className="header">
                         <div className="logo">
-                            <div className="logo-icon">
+                            <div className="logo-icon" style={{background: 'none', borderRadius: '0'}}>
                                 <img src="assets/logo.png" alt="Family Webs" style={{width: '40px', height: '40px', objectFit: 'contain'}} />
                             </div>
                             <span className="logo-text">Family Webs</span>
