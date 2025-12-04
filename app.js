@@ -574,7 +574,7 @@
                 <div className="modal-overlay" onClick={onClose}>
                     <div className="modal" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
-                            <h2 className="modal-title">Add Partner</h2>
+                            <h2 className="modal-title">Add Relationship</h2>
                             <button className="btn btn-ghost btn-icon" onClick={onClose}>
                                 {Icons.close}
                             </button>
@@ -668,7 +668,7 @@
                                 onClick={handleSubmit}
                                 disabled={!spouse1 || !spouse2}
                             >
-                                Add Partner
+                                Add Relationship
                             </button>
                         </div>
                     </div>
@@ -1124,9 +1124,18 @@
                     delete newPeople[personId];
 
                     // Remove from marriages
+                    // Marriage structure: [parent1, parent2, child1, child2, ...]
+                    // If person is a parent (first two positions), remove entire relationship
+                    // If person is a child, just remove them from the relationship
                     const newMarriages = prev.mariages
-                        .map(m => m.filter(id => id !== personId))
-                        .filter(m => m.length >= 2); // Keep only valid marriages
+                        .filter(m => {
+                            // If person is one of the parents (first two positions), remove entire relationship
+                            if (m[0] === personId || m[1] === personId) {
+                                return false;
+                            }
+                            return true;
+                        })
+                        .map(m => m.filter(id => id !== personId)); // Remove person if they're a child
 
                     return {
                         ...prev,
@@ -1296,7 +1305,7 @@
                                         style={{width: '100%', marginBottom: '8px'}}
                                         onClick={() => setShowAddMarriageModal(true)}
                                     >
-                                        {Icons.marriage} Add Partner
+                                        {Icons.marriage} Add Relationship
                                     </button>
                                     <button
                                         className="btn btn-secondary"
