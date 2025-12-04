@@ -12,3 +12,5 @@ Have the webview nodes go to the centre of each marrige node
 Option to put in mainden names that will show nee maiden name as well
 
 Disable regenerating the web tree when adding relationships or saving anything, only want it to regen if you click the regen button
+
+Option to export the tree to SVG
