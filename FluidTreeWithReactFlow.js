@@ -703,42 +703,21 @@ const FluidTreeInner = ({ treeData, selectedPerson, onSelectPerson, getNodePosit
         // Only recalculate if treeData actually changed (not just a re-render)
         if (prevTreeDataRef.current !== treeData) {
             const hasViewState = treeData.viewState && treeData.viewState.nodes && treeData.viewState.nodes.length > 0;
-            console.log('🔄 TreeData changed, recalculating layout', hasViewState ? '(with saved positions)' : 'and applying Web Mode');
+            console.log('🔄 TreeData changed, recalculating layout', hasViewState ? '(with saved positions)' : '(basic layout only)');
 
             const { nodes: newNodes, edges: newEdges } = calculateFluidLayout(treeData, treeData.viewState);
             setNodes(newNodes);
             setEdges(newEdges);
             prevTreeDataRef.current = treeData;
 
-            // Only automatically apply Web Mode if there's no saved view state
-            if (!hasViewState) {
-                setTimeout(async () => {
-                    try {
-                        const organizedNodes = await applyWebMode(newNodes, newEdges);
-                        setNodes(organizedNodes);
-
-                        // Fit view after Web Mode
-                        setTimeout(() => {
-                            fitView({
-                                padding: 0.2,
-                                duration: 800,
-                                maxZoom: 1.5
-                            });
-                        }, 100);
-                    } catch (error) {
-                        console.error('Error during auto Web Mode:', error);
-                    }
-                }, 50);
-            } else {
-                // Just fit view to show saved positions
-                setTimeout(() => {
-                    fitView({
-                        padding: 0.2,
-                        duration: 800,
-                        maxZoom: 1.5
-                    });
-                }, 100);
-            }
+            // Fit view to show positions (Web Mode regeneration is now manual only via button)
+            setTimeout(() => {
+                fitView({
+                    padding: 0.2,
+                    duration: 800,
+                    maxZoom: 1.5
+                });
+            }, 100);
         }
     }, [treeData, setNodes, setEdges, fitView]);
 
