@@ -501,7 +501,10 @@
                                 {getInitials(person.name)}
                             </div>
                             <h2 className="detail-title">{person.name}</h2>
-                            <p className="detail-subtitle">{person.surname}</p>
+                            <p className="detail-subtitle">
+                                {person.surname}
+                                {person.maidenName && ` (née ${person.maidenName})`}
+                            </p>
                             {relationshipToHome && (
                                 <p style={{
                                     marginTop: '8px',
@@ -538,11 +541,21 @@
                                     </div>
                                     <div className="form-group">
                                         <label className="form-label">Surname</label>
-                                        <input 
+                                        <input
                                             type="text"
                                             className="form-input"
                                             value={editedPerson.surname || ''}
                                             onChange={(e) => handleInputChange('surname', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Maiden Name (optional)</label>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            value={editedPerson.maidenName || ''}
+                                            onChange={(e) => handleInputChange('maidenName', e.target.value)}
+                                            placeholder="e.g., Johnson"
                                         />
                                     </div>
                                     <div className="form-group">
@@ -721,6 +734,7 @@
             const [newPerson, setNewPerson] = useState({
                 name: '',
                 surname: '',
+                maidenName: '',
                 gender: '',
                 events: [],
                 information: '',
@@ -737,7 +751,7 @@
                     events: birthDate ? [{ type: '$_BIRTH', dateStart: birthDate, comment: '' }] : []
                 };
                 onAdd(person, { type: '', personId: '' });
-                setNewPerson({ name: '', surname: '', gender: '', events: [], information: '', photos: [], attachments: [] });
+                setNewPerson({ name: '', surname: '', maidenName: '', gender: '', events: [], information: '', photos: [], attachments: [] });
                 setBirthDate('');
                 onClose();
             };
@@ -764,12 +778,22 @@
                             </div>
                             <div className="form-group">
                                 <label className="form-label">Surname *</label>
-                                <input 
+                                <input
                                     type="text"
                                     className="form-input"
                                     value={newPerson.surname}
                                     onChange={(e) => setNewPerson(prev => ({...prev, surname: e.target.value}))}
                                     placeholder="e.g., Smith"
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Maiden Name (optional)</label>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    value={newPerson.maidenName || ''}
+                                    onChange={(e) => setNewPerson(prev => ({...prev, maidenName: e.target.value}))}
+                                    placeholder="e.g., Johnson"
                                 />
                             </div>
                             <div className="form-group">
@@ -822,7 +846,7 @@
             // Filter people based on search
             const filteredSpouse1Options = useMemo(() => {
                 return Object.entries(treeData.people).filter(([id, person]) => {
-                    const fullName = `${person.name} ${person.surname}`.toLowerCase();
+                    const fullName = `${person.name} ${person.surname} ${person.maidenName || ''}`.toLowerCase();
                     return fullName.includes(spouse1Search.toLowerCase());
                 });
             }, [treeData.people, spouse1Search]);
@@ -831,7 +855,7 @@
                 return Object.entries(treeData.people)
                     .filter(([id]) => id !== spouse1)
                     .filter(([id, person]) => {
-                        const fullName = `${person.name} ${person.surname}`.toLowerCase();
+                        const fullName = `${person.name} ${person.surname} ${person.maidenName || ''}`.toLowerCase();
                         return fullName.includes(spouse2Search.toLowerCase());
                     });
             }, [treeData.people, spouse1, spouse2Search]);
@@ -840,7 +864,7 @@
                 return Object.entries(treeData.people)
                     .filter(([id]) => id !== spouse1 && id !== spouse2)
                     .filter(([id, person]) => {
-                        const fullName = `${person.name} ${person.surname}`.toLowerCase();
+                        const fullName = `${person.name} ${person.surname} ${person.maidenName || ''}`.toLowerCase();
                         return fullName.includes(childrenSearch.toLowerCase());
                     });
             }, [treeData.people, spouse1, spouse2, childrenSearch]);
@@ -981,7 +1005,7 @@
 
             const filteredPeople = useMemo(() => {
                 return Object.entries(treeData.people).filter(([id, person]) => {
-                    const fullName = `${person.name} ${person.surname}`.toLowerCase();
+                    const fullName = `${person.name} ${person.surname} ${person.maidenName || ''}`.toLowerCase();
                     return fullName.includes(searchQuery.toLowerCase());
                 });
             }, [treeData.people, searchQuery]);
@@ -1111,7 +1135,7 @@
             // Filter people for spouse selection
             const filteredSpouse1Options = useMemo(() => {
                 return Object.entries(treeData.people).filter(([id, person]) => {
-                    const fullName = `${person.name} ${person.surname}`.toLowerCase();
+                    const fullName = `${person.name} ${person.surname} ${person.maidenName || ''}`.toLowerCase();
                     return fullName.includes(spouse1Search.toLowerCase());
                 });
             }, [treeData.people, spouse1Search]);
@@ -1120,7 +1144,7 @@
                 return Object.entries(treeData.people)
                     .filter(([id]) => id !== editedSpouse1)
                     .filter(([id, person]) => {
-                        const fullName = `${person.name} ${person.surname}`.toLowerCase();
+                        const fullName = `${person.name} ${person.surname} ${person.maidenName || ''}`.toLowerCase();
                         return fullName.includes(spouse2Search.toLowerCase());
                     });
             }, [treeData.people, editedSpouse1, spouse2Search]);
@@ -1129,7 +1153,7 @@
                 return Object.entries(treeData.people)
                     .filter(([id]) => id !== editedSpouse1 && id !== editedSpouse2)
                     .filter(([id, person]) => {
-                        const fullName = `${person.name} ${person.surname}`.toLowerCase();
+                        const fullName = `${person.name} ${person.surname} ${person.maidenName || ''}`.toLowerCase();
                         return fullName.includes(childrenSearch.toLowerCase());
                     });
             }, [treeData.people, editedSpouse1, editedSpouse2, childrenSearch]);
@@ -1398,7 +1422,7 @@
             const filteredPeople = useMemo(() => {
                 if (!treeData) return [];
                 return Object.entries(treeData.people).filter(([id, person]) => {
-                    const fullName = `${person.name} ${person.surname}`.toLowerCase();
+                    const fullName = `${person.name} ${person.surname} ${person.maidenName || ''}`.toLowerCase();
                     return fullName.includes(searchQuery.toLowerCase());
                 });
             }, [treeData, searchQuery]);

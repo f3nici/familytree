@@ -580,7 +580,10 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
                                         </span>
                                     )}
                                 </div>
-                                <div className="node-surname">{person.surname}</div>
+                                <div className="node-surname">
+                                    {person.surname}
+                                    {person.maidenName && ` (née ${person.maidenName})`}
+                                </div>
                                 {relationship && (
                                     <div style={{
                                         fontSize: '0.75rem',
