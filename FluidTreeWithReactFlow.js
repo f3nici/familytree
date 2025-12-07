@@ -73,7 +73,10 @@ const PersonNode = ({ data, selected }) => {
                     </span>
                 )}
             </div>
-            <div className="node-surname-small">{data.person?.surname}</div>
+            <div className="node-surname-small">
+                {data.person?.surname}
+                {data.person?.maidenName && ` (née ${data.person.maidenName})`}
+            </div>
             {data.relationship && (
                 <div style={{
                     fontSize: '0.7rem',
