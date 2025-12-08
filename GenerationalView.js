@@ -703,14 +703,21 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
         zoomToFit();
     }, [zoomToFit]);
 
-    // Auto zoom-to-fit on initial load
+    // Auto zoom-to-fit on initial load and when switching to this view
+    useEffect(() => {
+        if (layout.positions.size > 0 && containerRef.current) {
+            // Reset the flag when layout changes (e.g., switching views)
+            setInitialZoomSet(false);
+        }
+    }, [layout]);
+
     useEffect(() => {
         if (!initialZoomSet && layout.positions.size > 0 && containerRef.current) {
-            const timer = setTimeout(() => {
+            // Apply zoom-to-fit immediately without delay to prevent zoom animation
+            requestAnimationFrame(() => {
                 zoomToFit();
                 setInitialZoomSet(true);
-            }, 100);
-            return () => clearTimeout(timer);
+            });
         }
     }, [initialZoomSet, layout, zoomToFit]);
 
@@ -742,9 +749,7 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
         >
             {/* Zoom controls */}
             <div className="gen-view-controls">
-                <button className="gen-control-btn" onClick={() => setViewTransform(prev => ({ ...prev, scale: Math.min(prev.scale * 1.2, 3) }))}>+</button>
-                <button className="gen-control-btn" onClick={() => setViewTransform(prev => ({ ...prev, scale: Math.max(prev.scale * 0.8, 0.1) }))}>−</button>
-                <button className="gen-control-btn" onClick={resetView}>⟲</button>
+                <button className="gen-control-btn" onClick={resetView} title="Reset view">🎯</button>
             </div>
 
             {/* Canvas with transform */}
