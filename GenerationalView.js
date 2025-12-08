@@ -8,8 +8,11 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
     const containerRef = useRef(null);
     const [viewTransform, setViewTransform] = useState({ x: 100, y: 100, scale: 1 });
     const [isDragging, setIsDragging] = useState(false);
-    const [dragStart, setDragStart] = useState({ x: 0 });
+    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
     const [initialZoomSet, setInitialZoomSet] = useState(false);
+    const [draggingNode, setDraggingNode] = useState(null);
+    const [nodeDragStart, setNodeDragStart] = useState({ x: 0, y: 0 });
+    const [nodePositions, setNodePositions] = useState(new Map());
 
     // STEP 1: Calculate generations with proper conflict resolution
     const generationData = useMemo(() => {
@@ -161,11 +164,41 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
     const layout = useMemo(() => {
         const CARD_WIDTH = 200;
         const CARD_HEIGHT = 150;
-        const MARRIAGE_SIZE = 16;
+        const MARRIAGE_SIZE = 20; // Increased to match Web View
+
+        // Calculate marriages per generation for adaptive spacing
+        const marriagesPerGeneration = new Map();
+        treeData.mariages.forEach((marriage, idx) => {
+            if (marriage.length < 2) return;
+            const [parent1, parent2] = marriage;
+            const gen = generationData.personGeneration.get(parent1);
+            if (gen !== undefined) {
+                marriagesPerGeneration.set(gen, (marriagesPerGeneration.get(gen) || 0) + 1);
+            }
+        });
+
+        console.log('📊 Marriages per generation:', Object.fromEntries(marriagesPerGeneration));
+
+        // Calculate adaptive rank separation
+        // Base spacing + additional spacing per marriage (to accommodate marriage lines)
+        const BASE_RANK_SEP = 200;
+        const SPACING_PER_MARRIAGE = 30;
+
+        // Build custom ranksep based on marriages in previous generation
+        const calculateRankSep = (rank) => {
+            const marriagesInRank = marriagesPerGeneration.get(rank) || 0;
+            const spacing = BASE_RANK_SEP + (marriagesInRank * SPACING_PER_MARRIAGE);
+            console.log(`  Gen ${rank}: ${marriagesInRank} marriages → ${spacing}px spacing to next gen`);
+            return spacing;
+        };
 
         const dagreGraph = new dagre.graphlib.Graph();
         dagreGraph.setDefaultEdgeLabel(() => ({}));
-        dagreGraph.setGraph({ rankdir: 'TB', nodesep: 80, ranksep: 180 });
+        dagreGraph.setGraph({
+            rankdir: 'TB',
+            nodesep: 80,
+            ranksep: 250 // Will be adjusted per rank below
+        });
 
         const nodes = [];
         const edges = [];
@@ -210,17 +243,71 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
             if (!dagreNode) return;
 
             if (node.type === 'person') {
-                positions.set(node.id, {
-                    x: dagreNode.x - CARD_WIDTH / 2,
-                    y: dagreNode.y - CARD_HEIGHT / 2,
-                    width: CARD_WIDTH,
-                    height: CARD_HEIGHT
-                });
+                // Check if we have a custom dragged position
+                const customPos = nodePositions.get(node.id);
+                if (customPos) {
+                    positions.set(node.id, {
+                        x: customPos.x,
+                        y: customPos.y,
+                        width: CARD_WIDTH,
+                        height: CARD_HEIGHT
+                    });
+                } else {
+                    positions.set(node.id, {
+                        x: dagreNode.x - CARD_WIDTH / 2,
+                        y: dagreNode.y - CARD_HEIGHT / 2,
+                        width: CARD_WIDTH,
+                        height: CARD_HEIGHT
+                    });
+                }
             } else {
                 marriageNodePositions.set(node.id, {
                     x: dagreNode.x,
                     y: dagreNode.y,
-                    size: MARRIAGE_SIZE * 2
+                    size: MARRIAGE_SIZE
+                });
+            }
+        });
+
+        // Now adjust marriage node positions for stacked marriages
+        // Group marriages by person to detect multiple marriages
+        const personMarriages = new Map();
+        treeData.mariages.forEach((marriage, idx) => {
+            if (marriage.length < 2) return;
+            const [parent1, parent2] = marriage;
+
+            if (!personMarriages.has(parent1)) personMarriages.set(parent1, []);
+            if (!personMarriages.has(parent2)) personMarriages.set(parent2, []);
+
+            personMarriages.get(parent1).push({ idx, spouse: parent2, marriageId: `marriage-${idx}` });
+            personMarriages.get(parent2).push({ idx, spouse: parent1, marriageId: `marriage-${idx}` });
+        });
+
+        // Adjust marriage node Y positions for people with multiple marriages
+        const MARRIAGE_STACK_OFFSET = 40; // Distance between stacked marriages
+        const MARRIAGE_BASE_OFFSET = 60; // Initial distance below person
+        const adjustedMarriages = new Set(); // Track which marriages we've already adjusted
+
+        personMarriages.forEach((marriages, personId) => {
+            if (marriages.length > 1) {
+                // Sort marriages to ensure consistent ordering
+                marriages.sort((a, b) => a.idx - b.idx);
+
+                marriages.forEach((marriage, stackIndex) => {
+                    // Only adjust each marriage node once
+                    if (!adjustedMarriages.has(marriage.marriageId)) {
+                        const marriagePos = marriageNodePositions.get(marriage.marriageId);
+
+                        if (marriagePos) {
+                            const personPos = positions.get(personId);
+                            if (personPos) {
+                                // Stack marriages vertically below the person
+                                const offset = MARRIAGE_BASE_OFFSET + (stackIndex * MARRIAGE_STACK_OFFSET);
+                                marriagePos.y = personPos.y + CARD_HEIGHT + offset;
+                                adjustedMarriages.add(marriage.marriageId);
+                            }
+                        }
+                    }
                 });
             }
         });
@@ -230,9 +317,10 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
             marriageNodePositions,
             CARD_WIDTH,
             CARD_HEIGHT,
-            MARRIAGE_SIZE
+            MARRIAGE_SIZE,
+            marriagesPerGeneration
         };
-    }, [generationData, treeData]);
+    }, [generationData, treeData, nodePositions]);
 
     // STEP 3: Generate connection lines using orthogonal (right angle) routing
     const connectionLines = useMemo(() => {
@@ -350,21 +438,72 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
     }, [viewTransform]);
 
     const handleMouseDown = useCallback((e) => {
-        if (e.target.closest('.gen-person-card')) return;
+        // Check if clicking on a person card for node dragging
+        const personCard = e.target.closest('.gen-person-card');
+        if (personCard) {
+            const personId = personCard.getAttribute('data-person-id');
+            if (personId) {
+                setDraggingNode(personId);
+                const pos = layout.positions.get(personId);
+                if (pos) {
+                    // Store the offset from the card's top-left to the click point
+                    const rect = personCard.getBoundingClientRect();
+                    const canvasRect = containerRef.current.getBoundingClientRect();
+                    const clickX = (e.clientX - canvasRect.left - viewTransform.x) / viewTransform.scale;
+                    const clickY = (e.clientY - canvasRect.top - viewTransform.y) / viewTransform.scale;
+                    setNodeDragStart({
+                        x: clickX - pos.x,
+                        y: clickY - pos.y
+                    });
+                }
+                e.stopPropagation();
+                return;
+            }
+        }
+
+        // Otherwise, start canvas panning
         setIsDragging(true);
-        setDragStart({ x: e.clientX - viewTransform.x });
-    }, [viewTransform.x]);
+        setDragStart({
+            x: e.clientX - viewTransform.x,
+            y: e.clientY - viewTransform.y
+        });
+    }, [viewTransform, layout]);
 
     const handleMouseMove = useCallback((e) => {
-        if (!isDragging) return;
-        setViewTransform(prev => ({
-            ...prev,
-            x: e.clientX - dragStart.x
-        }));
-    }, [isDragging, dragStart]);
+        if (draggingNode) {
+            // Dragging a node
+            const canvasRect = containerRef.current.getBoundingClientRect();
+            const mouseX = (e.clientX - canvasRect.left - viewTransform.x) / viewTransform.scale;
+            const mouseY = (e.clientY - canvasRect.top - viewTransform.y) / viewTransform.scale;
+
+            // Calculate new position
+            let newX = mouseX - nodeDragStart.x;
+            let newY = mouseY - nodeDragStart.y;
+
+            // Snap to 20px grid
+            const GRID_SIZE = 20;
+            newX = Math.round(newX / GRID_SIZE) * GRID_SIZE;
+            newY = Math.round(newY / GRID_SIZE) * GRID_SIZE;
+
+            // Update node position
+            setNodePositions(prev => {
+                const newPositions = new Map(prev);
+                newPositions.set(draggingNode, { x: newX, y: newY });
+                return newPositions;
+            });
+        } else if (isDragging) {
+            // Panning the canvas - support both X and Y directions
+            setViewTransform(prev => ({
+                ...prev,
+                x: e.clientX - dragStart.x,
+                y: e.clientY - dragStart.y
+            }));
+        }
+    }, [isDragging, draggingNode, dragStart, nodeDragStart, viewTransform]);
 
     const handleMouseUp = useCallback(() => {
         setIsDragging(false);
+        setDraggingNode(null);
     }, []);
 
     // Calculate zoom-to-fit
@@ -453,7 +592,7 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
-            style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+            style={{ cursor: draggingNode ? 'grabbing' : (isDragging ? 'grabbing' : 'grab') }}
         >
             {/* Zoom controls */}
             <div className="gen-view-controls">
