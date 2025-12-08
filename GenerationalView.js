@@ -388,6 +388,41 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
         const lines = [];
         const { positions, marriageNodePositions, CARD_WIDTH, CARD_HEIGHT } = layout;
 
+        // First, build a map of marriages per person to determine connection point offsets
+        const personMarriagesMap = new Map();
+        treeData.mariages.forEach((marriage, idx) => {
+            if (marriage.length < 2) return;
+            const [parent1, parent2] = marriage;
+
+            if (!personMarriagesMap.has(parent1)) personMarriagesMap.set(parent1, []);
+            if (!personMarriagesMap.has(parent2)) personMarriagesMap.set(parent2, []);
+
+            personMarriagesMap.get(parent1).push({ idx, spouse: parent2 });
+            personMarriagesMap.get(parent2).push({ idx, spouse: parent1 });
+        });
+
+        // Sort marriages for each person to ensure consistent ordering
+        personMarriagesMap.forEach((marriages, personId) => {
+            marriages.sort((a, b) => a.idx - b.idx);
+        });
+
+        // Helper function to calculate connection point offset
+        const getConnectionOffset = (personId, marriageIdx) => {
+            const marriages = personMarriagesMap.get(personId) || [];
+            const totalMarriages = marriages.length;
+
+            if (totalMarriages === 0) return 0.5; // Center (shouldn't happen)
+            if (totalMarriages === 1) return 0.5; // Center
+
+            // Find which index this marriage is for this person
+            const marriageIndex = marriages.findIndex(m => m.idx === marriageIdx);
+            if (marriageIndex === -1) return 0.5; // Fallback to center
+
+            // Calculate offset based on position
+            // For n marriages, use positions: 1/(n+1), 2/(n+1), 3/(n+1), ..., n/(n+1)
+            return (marriageIndex + 1) / (totalMarriages + 1);
+        };
+
         treeData.mariages.forEach((marriage, marriageIdx) => {
             if (marriage.length < 2) return;
 
@@ -399,19 +434,26 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
 
             if (!p1Pos || !p2Pos || !marriageNodePos) return;
 
-            // Calculate center and bottom positions for person cards
-            const p1CenterX = p1Pos.x + CARD_WIDTH / 2;
+            // Calculate connection offsets for each parent
+            const p1Offset = getConnectionOffset(parent1Id, marriageIdx);
+            const p2Offset = getConnectionOffset(parent2Id, marriageIdx);
+
+            // Calculate connection points with offsets
+            const p1ConnectX = p1Pos.x + (CARD_WIDTH * p1Offset);
             const p1BottomY = p1Pos.y + CARD_HEIGHT;
-            const p2CenterX = p2Pos.x + CARD_WIDTH / 2;
+            const p2ConnectX = p2Pos.x + (CARD_WIDTH * p2Offset);
             const p2BottomY = p2Pos.y + CARD_HEIGHT;
 
             // Determine which parent is on the left and which is on the right
+            const p1CenterX = p1Pos.x + CARD_WIDTH / 2;
+            const p2CenterX = p2Pos.x + CARD_WIDTH / 2;
+
             const leftParent = p1CenterX < p2CenterX ?
-                { id: parent1Id, x: p1CenterX, y: p1BottomY } :
-                { id: parent2Id, x: p2CenterX, y: p2BottomY };
+                { id: parent1Id, x: p1ConnectX, y: p1BottomY } :
+                { id: parent2Id, x: p2ConnectX, y: p2BottomY };
             const rightParent = p1CenterX < p2CenterX ?
-                { id: parent2Id, x: p2CenterX, y: p2BottomY } :
-                { id: parent1Id, x: p1CenterX, y: p1BottomY };
+                { id: parent2Id, x: p2ConnectX, y: p2BottomY } :
+                { id: parent1Id, x: p1ConnectX, y: p1BottomY };
 
             // Check if this marriage involves the selected person
             const isMarriageHighlighted = selectedPerson && (parent1Id === selectedPerson || parent2Id === selectedPerson);
