@@ -8,7 +8,7 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
     const containerRef = useRef(null);
     const [viewTransform, setViewTransform] = useState({ x: 100, y: 100, scale: 1 });
     const [isDragging, setIsDragging] = useState(false);
-    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    const [dragStart, setDragStart] = useState({ x: 0 });
     const [initialZoomSet, setInitialZoomSet] = useState(false);
 
     // STEP 1: Calculate generations with proper conflict resolution
@@ -255,13 +255,15 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
             const p2CenterX = p2Pos.x + CARD_WIDTH / 2;
             const p2BottomY = p2Pos.y + CARD_HEIGHT;
 
+            const marriageSpacing = 14;
+
             // Check if this marriage involves the selected person
             const isMarriageHighlighted = selectedPerson && (parent1Id === selectedPerson || parent2Id === selectedPerson);
 
             // Orthogonal line from parent 1 to marriage node (down then across)
             lines.push({
                 key: `p1-to-marriage-${marriageIdx}`,
-                path: `M ${p1CenterX} ${p1BottomY} L ${p1CenterX} ${marriageNodePos.y} L ${marriageNodePos.x} ${marriageNodePos.y}`,
+                path: `M ${p1CenterX} ${p1BottomY} L ${p1CenterX} ${marriageNodePos.y - marriageSpacing} L ${marriageNodePos.x} ${marriageNodePos.y - marriageSpacing} L ${marriageNodePos.x} ${marriageNodePos.y}`,
                 type: 'marriage',
                 highlighted: isMarriageHighlighted,
                 relatedPeople: [parent1Id, parent2Id]
@@ -270,16 +272,13 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
             // Orthogonal line from parent 2 to marriage node (down then across)
             lines.push({
                 key: `p2-to-marriage-${marriageIdx}`,
-                path: `M ${p2CenterX} ${p2BottomY} L ${p2CenterX} ${marriageNodePos.y} L ${marriageNodePos.x} ${marriageNodePos.y}`,
+                path: `M ${p2CenterX} ${p2BottomY} L ${p2CenterX} ${marriageNodePos.y + marriageSpacing} L ${marriageNodePos.x} ${marriageNodePos.y + marriageSpacing} L ${marriageNodePos.x} ${marriageNodePos.y}`,
                 type: 'marriage',
                 highlighted: isMarriageHighlighted,
                 relatedPeople: [parent1Id, parent2Id]
             });
 
             // Orthogonal lines from marriage node to children
-            const siblingCount = childrenIds.length;
-            const siblingSpread = 22;
-
             childrenIds.forEach((childId, childIdx) => {
                 const childPos = positions.get(childId);
                 if (!childPos) return;
@@ -288,11 +287,7 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
                 const childTopY = childPos.y;
 
                 // Down from marriage node, then across to child, then up to child
-                const middleY = (marriageNodePos.y + childTopY) / 2;
-
-                // Offset the horizontal runs slightly per sibling to avoid overlapping lines
-                const offsetFromCenter = (childIdx - (siblingCount - 1) / 2) * siblingSpread;
-                const intermediateY = middleY + offsetFromCenter;
+                const intermediateY = (marriageNodePos.y + childTopY) / 2;
 
                 // Check if this parent-child relationship involves the selected person
                 const isParentChildHighlighted = selectedPerson &&
@@ -357,15 +352,14 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
     const handleMouseDown = useCallback((e) => {
         if (e.target.closest('.gen-person-card')) return;
         setIsDragging(true);
-        setDragStart({ x: e.clientX - viewTransform.x, y: e.clientY - viewTransform.y });
-    }, [viewTransform.x, viewTransform.y]);
+        setDragStart({ x: e.clientX - viewTransform.x });
+    }, [viewTransform.x]);
 
     const handleMouseMove = useCallback((e) => {
         if (!isDragging) return;
         setViewTransform(prev => ({
             ...prev,
-            x: e.clientX - dragStart.x,
-            y: e.clientY - dragStart.y
+            x: e.clientX - dragStart.x
         }));
     }, [isDragging, dragStart]);
 
