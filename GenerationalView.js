@@ -179,25 +179,12 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
 
         console.log('📊 Marriages per generation:', Object.fromEntries(marriagesPerGeneration));
 
-        // Calculate adaptive rank separation
-        // Base spacing + additional spacing per marriage (to accommodate marriage lines)
-        const BASE_RANK_SEP = 200;
-        const SPACING_PER_MARRIAGE = 30;
-
-        // Build custom ranksep based on marriages in previous generation
-        const calculateRankSep = (rank) => {
-            const marriagesInRank = marriagesPerGeneration.get(rank) || 0;
-            const spacing = BASE_RANK_SEP + (marriagesInRank * SPACING_PER_MARRIAGE);
-            console.log(`  Gen ${rank}: ${marriagesInRank} marriages → ${spacing}px spacing to next gen`);
-            return spacing;
-        };
-
         const dagreGraph = new dagre.graphlib.Graph();
         dagreGraph.setDefaultEdgeLabel(() => ({}));
         dagreGraph.setGraph({
             rankdir: 'TB',
             nodesep: 80,
-            ranksep: 250 // Will be adjusted per rank below
+            ranksep: 120 // Base spacing between generations
         });
 
         const nodes = [];
@@ -238,34 +225,88 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
         const positions = new Map();
         const marriageNodePositions = new Map();
 
+        // First pass: Get initial positions from Dagre
+        const initialPositions = new Map();
+        const initialMarriagePositions = new Map();
+
         nodes.forEach(node => {
             const dagreNode = dagreGraph.node(node.id);
             if (!dagreNode) return;
 
             if (node.type === 'person') {
-                // Check if we have a custom dragged position
-                const customPos = nodePositions.get(node.id);
-                if (customPos) {
-                    positions.set(node.id, {
-                        x: customPos.x,
-                        y: customPos.y,
-                        width: CARD_WIDTH,
-                        height: CARD_HEIGHT
-                    });
-                } else {
-                    positions.set(node.id, {
-                        x: dagreNode.x - CARD_WIDTH / 2,
-                        y: dagreNode.y - CARD_HEIGHT / 2,
-                        width: CARD_WIDTH,
-                        height: CARD_HEIGHT
-                    });
-                }
+                initialPositions.set(node.id, {
+                    x: dagreNode.x - CARD_WIDTH / 2,
+                    y: dagreNode.y - CARD_HEIGHT / 2,
+                    width: CARD_WIDTH,
+                    height: CARD_HEIGHT,
+                    generation: generationData.personGeneration.get(node.id)
+                });
             } else {
-                marriageNodePositions.set(node.id, {
+                initialMarriagePositions.set(node.id, {
                     x: dagreNode.x,
                     y: dagreNode.y,
                     size: MARRIAGE_SIZE
                 });
+            }
+        });
+
+        // Calculate adaptive Y offsets based on marriage count per generation
+        const BASE_SPACING_PER_MARRIAGE = 25; // Additional spacing per marriage
+        const generationYOffsets = new Map();
+        let cumulativeOffset = 0;
+
+        // Sort generations to process them in order
+        const sortedGens = Array.from(marriagesPerGeneration.keys()).sort((a, b) => a - b);
+        generationYOffsets.set(0, 0); // First generation has no offset
+
+        sortedGens.forEach(gen => {
+            const marriageCount = marriagesPerGeneration.get(gen) || 0;
+            const additionalSpacing = marriageCount * BASE_SPACING_PER_MARRIAGE;
+            cumulativeOffset += additionalSpacing;
+            generationYOffsets.set(gen + 1, cumulativeOffset); // Offset applies to next generation
+            console.log(`  Gen ${gen}: ${marriageCount} marriages → +${additionalSpacing}px spacing to Gen ${gen + 1} (cumulative: ${cumulativeOffset}px)`);
+        });
+
+        // Second pass: Apply custom positions and adaptive spacing
+        initialPositions.forEach((pos, nodeId) => {
+            const gen = pos.generation || 0;
+            const yOffset = generationYOffsets.get(gen) || 0;
+
+            // Check if we have a custom dragged position (only X changes, Y stays with generation)
+            const customPos = nodePositions.get(nodeId);
+            if (customPos) {
+                positions.set(nodeId, {
+                    x: customPos.x,
+                    y: pos.y + yOffset,
+                    width: CARD_WIDTH,
+                    height: CARD_HEIGHT
+                });
+            } else {
+                positions.set(nodeId, {
+                    x: pos.x,
+                    y: pos.y + yOffset,
+                    width: CARD_WIDTH,
+                    height: CARD_HEIGHT
+                });
+            }
+        });
+
+        // Apply same offsets to marriage nodes based on their parent's generation
+        initialMarriagePositions.forEach((pos, nodeId) => {
+            // Extract marriage index from nodeId (format: "marriage-{idx}")
+            const idx = parseInt(nodeId.split('-')[1]);
+            const marriage = treeData.mariages[idx];
+            if (marriage && marriage.length >= 2) {
+                const parentGen = generationData.personGeneration.get(marriage[0]) || 0;
+                const yOffset = generationYOffsets.get(parentGen) || 0;
+
+                marriageNodePositions.set(nodeId, {
+                    x: pos.x,
+                    y: pos.y + yOffset,
+                    size: MARRIAGE_SIZE
+                });
+            } else {
+                marriageNodePositions.set(nodeId, pos);
             }
         });
 
@@ -338,35 +379,42 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
 
             if (!p1Pos || !p2Pos || !marriageNodePos) return;
 
+            // Calculate center positions for person cards
             const p1CenterX = p1Pos.x + CARD_WIDTH / 2;
-            const p1BottomY = p1Pos.y + CARD_HEIGHT;
+            const p1CenterY = p1Pos.y + CARD_HEIGHT / 2;
             const p2CenterX = p2Pos.x + CARD_WIDTH / 2;
-            const p2BottomY = p2Pos.y + CARD_HEIGHT;
+            const p2CenterY = p2Pos.y + CARD_HEIGHT / 2;
 
-            const marriageSpacing = 14;
+            // Determine which parent is on the left and which is on the right
+            const leftParent = p1CenterX < p2CenterX ?
+                { id: parent1Id, x: p1Pos.x + CARD_WIDTH, y: p1CenterY, centerX: p1CenterX } :
+                { id: parent2Id, x: p2Pos.x + CARD_WIDTH, y: p2CenterY, centerX: p2CenterX };
+            const rightParent = p1CenterX < p2CenterX ?
+                { id: parent2Id, x: p2Pos.x, y: p2CenterY, centerX: p2CenterX } :
+                { id: parent1Id, x: p1Pos.x, y: p1CenterY, centerX: p1CenterX };
 
             // Check if this marriage involves the selected person
             const isMarriageHighlighted = selectedPerson && (parent1Id === selectedPerson || parent2Id === selectedPerson);
 
-            // Orthogonal line from parent 1 to marriage node (down then across)
+            // Connect from right side of left parent to left side of marriage node
             lines.push({
-                key: `p1-to-marriage-${marriageIdx}`,
-                path: `M ${p1CenterX} ${p1BottomY} L ${p1CenterX} ${marriageNodePos.y - marriageSpacing} L ${marriageNodePos.x} ${marriageNodePos.y - marriageSpacing} L ${marriageNodePos.x} ${marriageNodePos.y}`,
+                key: `left-parent-to-marriage-${marriageIdx}`,
+                path: `M ${leftParent.x} ${leftParent.y} L ${marriageNodePos.x - 10} ${leftParent.y} L ${marriageNodePos.x - 10} ${marriageNodePos.y} L ${marriageNodePos.x} ${marriageNodePos.y}`,
                 type: 'marriage',
                 highlighted: isMarriageHighlighted,
                 relatedPeople: [parent1Id, parent2Id]
             });
 
-            // Orthogonal line from parent 2 to marriage node (down then across)
+            // Connect from left side of right parent to right side of marriage node
             lines.push({
-                key: `p2-to-marriage-${marriageIdx}`,
-                path: `M ${p2CenterX} ${p2BottomY} L ${p2CenterX} ${marriageNodePos.y + marriageSpacing} L ${marriageNodePos.x} ${marriageNodePos.y + marriageSpacing} L ${marriageNodePos.x} ${marriageNodePos.y}`,
+                key: `right-parent-to-marriage-${marriageIdx}`,
+                path: `M ${rightParent.x} ${rightParent.y} L ${marriageNodePos.x + 10} ${rightParent.y} L ${marriageNodePos.x + 10} ${marriageNodePos.y} L ${marriageNodePos.x} ${marriageNodePos.y}`,
                 type: 'marriage',
                 highlighted: isMarriageHighlighted,
                 relatedPeople: [parent1Id, parent2Id]
             });
 
-            // Orthogonal lines from marriage node to children
+            // Lines from marriage node to children (from bottom of marriage node to top of child)
             childrenIds.forEach((childId, childIdx) => {
                 const childPos = positions.get(childId);
                 if (!childPos) return;
@@ -383,7 +431,7 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
 
                 lines.push({
                     key: `marriage-to-child-${marriageIdx}-${childIdx}`,
-                    path: `M ${marriageNodePos.x} ${marriageNodePos.y} L ${marriageNodePos.x} ${intermediateY} L ${childCenterX} ${intermediateY} L ${childCenterX} ${childTopY}`,
+                    path: `M ${marriageNodePos.x} ${marriageNodePos.y + 10} L ${marriageNodePos.x} ${intermediateY} L ${childCenterX} ${intermediateY} L ${childCenterX} ${childTopY}`,
                     type: 'parent',
                     highlighted: isParentChildHighlighted,
                     relatedPeople: [parent1Id, parent2Id, childId]
@@ -471,26 +519,27 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
 
     const handleMouseMove = useCallback((e) => {
         if (draggingNode) {
-            // Dragging a node
+            // Dragging a node - horizontal only
             const canvasRect = containerRef.current.getBoundingClientRect();
             const mouseX = (e.clientX - canvasRect.left - viewTransform.x) / viewTransform.scale;
-            const mouseY = (e.clientY - canvasRect.top - viewTransform.y) / viewTransform.scale;
 
-            // Calculate new position
+            // Calculate new X position only (constrain to horizontal movement)
             let newX = mouseX - nodeDragStart.x;
-            let newY = mouseY - nodeDragStart.y;
 
-            // Snap to 20px grid
-            const GRID_SIZE = 20;
+            // Snap to 80px grid
+            const GRID_SIZE = 80;
             newX = Math.round(newX / GRID_SIZE) * GRID_SIZE;
-            newY = Math.round(newY / GRID_SIZE) * GRID_SIZE;
 
-            // Update node position
-            setNodePositions(prev => {
-                const newPositions = new Map(prev);
-                newPositions.set(draggingNode, { x: newX, y: newY });
-                return newPositions;
-            });
+            // Get current position to preserve Y coordinate
+            const currentPos = layout.positions.get(draggingNode);
+            if (currentPos) {
+                // Update node position (X only, keep original Y)
+                setNodePositions(prev => {
+                    const newPositions = new Map(prev);
+                    newPositions.set(draggingNode, { x: newX, y: currentPos.y });
+                    return newPositions;
+                });
+            }
         } else if (isDragging) {
             // Panning the canvas - support both X and Y directions
             setViewTransform(prev => ({
@@ -499,7 +548,7 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
                 y: e.clientY - dragStart.y
             }));
         }
-    }, [isDragging, draggingNode, dragStart, nodeDragStart, viewTransform]);
+    }, [isDragging, draggingNode, dragStart, nodeDragStart, viewTransform, layout]);
 
     const handleMouseUp = useCallback(() => {
         setIsDragging(false);
