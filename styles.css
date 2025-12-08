@@ -1124,28 +1124,31 @@
         }
 
         .gen-path {
-            stroke-width: 2.5;
             fill: none;
             stroke-linecap: round;
+            stroke-linejoin: round;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
         .gen-path-marriage {
-            stroke: var(--accent-dusty);
-            stroke-width: 3.5;
-            transition: all 0.3s ease;
+            stroke: var(--accent-warm);
+            stroke-width: 5;
+            stroke-dasharray: 12 8;
             opacity: 0.4;
+            animation: dash-flow 5s linear infinite;
         }
 
         .gen-path-parent {
             stroke: var(--accent-sage);
-            stroke-width: 2.5;
-            transition: all 0.3s ease;
+            stroke-width: 4.5;
+            stroke-dasharray: 10 7;
             opacity: 0.4;
+            animation: dash-flow 6s linear infinite;
         }
 
         .gen-path-highlighted {
             opacity: 1 !important;
-            stroke-width: 4.5 !important;
+            stroke-width: 6 !important;
             filter: drop-shadow(0 0 8px currentColor);
         }
 
@@ -1154,80 +1157,132 @@
             opacity: 1;
         }
 
+        /* Dashed line animation */
+        @keyframes dash-flow {
+            to {
+                stroke-dashoffset: -100;
+            }
+        }
+
         .gen-person-card {
             background: var(--bg-card);
             border: 2px solid var(--border-subtle);
-            border-radius: var(--radius-md);
-            padding: 20px;
+            border-radius: 16px;
+            padding: 16px 20px;
             min-width: 180px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: var(--shadow-soft);
+            cursor: move;
+            cursor: grab;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 16px rgba(44, 36, 22, 0.1);
             text-align: center;
             position: relative;
             z-index: 2;
+            user-select: none;
+        }
+
+        .gen-person-card:active {
+            cursor: grabbing;
         }
 
         .gen-person-card:hover {
-            transform: translateY(-4px);
-            box-shadow: var(--shadow-hover);
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: 0 12px 32px rgba(44, 36, 22, 0.15);
             border-color: var(--accent-warm-light);
         }
 
         .gen-person-card.selected {
             border-color: var(--accent-warm);
-            background: var(--accent-warm-light);
+            box-shadow: 0 0 0 4px var(--accent-warm-light), 0 12px 32px rgba(196, 149, 106, 0.3);
+            transform: translateY(-2px);
         }
 
         .gen-person-card.deceased::before {
             content: '✝';
             position: absolute;
-            top: -8px;
-            right: -8px;
-            width: 24px;
-            height: 24px;
-            background: var(--bg-card);
-            border: 2px solid var(--text-secondary);
+            top: -6px;
+            right: -6px;
+            width: 22px;
+            height: 22px;
+            background: var(--text-muted);
+            color: white;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 14px;
-            color: var(--text-secondary);
+            font-size: 11px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
             z-index: 10;
         }
 
-        /* Marriage node (small circle like Web Mode) */
+        /* Marriage node (gradient circle matching Web View) */
         .gen-marriage-node {
-            width: 16px;
-            height: 16px;
-            background: var(--accent-dusty);
+            width: 20px;
+            height: 20px;
+            background: linear-gradient(135deg, var(--accent-warm) 0%, #a67d4f 100%);
             border: 2px solid var(--bg-card);
             border-radius: 50%;
             z-index: 5;
-            box-shadow: var(--shadow-soft);
+            box-shadow: 0 2px 8px rgba(196, 149, 106, 0.4);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: grab;
+        }
+
+        .gen-marriage-node:active {
+            cursor: grabbing;
+        }
+
+        .gen-marriage-node:hover {
+            transform: scale(1.3);
+            box-shadow: 0 4px 12px rgba(196, 149, 106, 0.6);
         }
 
         .gen-person-card .node-avatar {
-            margin: 0 auto 12px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            margin: 0 auto 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-display);
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         .gen-person-card .node-name {
             font-family: var(--font-display);
-            font-size: 1.1rem;
+            font-size: 0.95rem;
             font-weight: 600;
             color: var(--text-primary);
             margin-bottom: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .gen-person-card .node-surname {
-            font-size: 0.95rem;
-            font-weight: 600;
+            font-size: 0.8rem;
             color: var(--text-secondary);
-            margin-bottom: 8px;
+            margin-bottom: 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .gen-person-card .node-dates {
-            font-size: 0.85rem;
+            font-size: 0.7rem;
             color: var(--text-muted);
+            line-height: 1.3;
+        }
+
+        /* Accessibility - Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            .gen-person-card,
+            .gen-marriage-node,
+            .gen-path {
+                transition: none !important;
+                animation: none !important;
+            }
         }
