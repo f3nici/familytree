@@ -609,8 +609,8 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
             // Calculate new X position only (constrain to horizontal movement)
             let newX = mouseX - nodeDragStart.x;
 
-            // Snap to 80px grid
-            const GRID_SIZE = 80;
+            // Snap to 20px grid
+            const GRID_SIZE = 20;
             newX = Math.round(newX / GRID_SIZE) * GRID_SIZE;
 
             // Check if dragging a person node or marriage node
