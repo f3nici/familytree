@@ -224,7 +224,7 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
         dagre.layout(dagreGraph);
 
         const positions = new Map();
-        const marriageNodePositions = new Map();
+        const calculatedMarriageNodePositions = new Map();
 
         // First pass: Get initial positions from Dagre
         const initialPositions = new Map();
@@ -314,19 +314,19 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
                     xPos = (parent1CenterX + parent2CenterX) / 2;
                 }
 
-                // Check if we have a custom dragged position
+                // Check if we have a custom dragged position from state
                 const customPos = marriageNodePositions.get(nodeId);
                 if (customPos) {
                     xPos = customPos.x;
                 }
 
-                marriageNodePositions.set(nodeId, {
+                calculatedMarriageNodePositions.set(nodeId, {
                     x: xPos,
                     y: pos.y + yOffset,
                     size: MARRIAGE_SIZE
                 });
             } else {
-                marriageNodePositions.set(nodeId, pos);
+                calculatedMarriageNodePositions.set(nodeId, pos);
             }
         });
 
@@ -357,7 +357,7 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
                 marriages.forEach((marriage, stackIndex) => {
                     // Only adjust each marriage node once
                     if (!adjustedMarriages.has(marriage.marriageId)) {
-                        const marriagePos = marriageNodePositions.get(marriage.marriageId);
+                        const marriagePos = calculatedMarriageNodePositions.get(marriage.marriageId);
 
                         if (marriagePos) {
                             const personPos = positions.get(personId);
@@ -375,7 +375,7 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson }) => {
 
         return {
             positions,
-            marriageNodePositions,
+            marriageNodePositions: calculatedMarriageNodePositions,
             CARD_WIDTH,
             CARD_HEIGHT,
             MARRIAGE_SIZE,
