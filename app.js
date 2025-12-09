@@ -1424,6 +1424,8 @@
             const [showEditRelationshipModal, setShowEditRelationshipModal] = useState(false);
             const [showHelpModal, setShowHelpModal] = useState(false);
             const [viewMode, setViewMode] = useState('web'); // 'web' or 'generational'
+            const [showMobileMenu, setShowMobileMenu] = useState(false);
+            const [showMobileDetailPanel, setShowMobileDetailPanel] = useState(false);
 
             const fileInputRef = useRef(null);
             const getNodePositionsRef = useRef(null);
@@ -1725,6 +1727,14 @@
             return (
                 <div className="app-container">
                     <header className="header">
+                        <button
+                            className="mobile-menu-button"
+                            onClick={() => setShowMobileMenu(!showMobileMenu)}
+                            aria-label="Toggle menu"
+                        >
+                            {Icons.list}
+                        </button>
+
                         <div className="logo">
                             <div className="logo-icon" style={{background: 'none', borderRadius: '0'}}>
                                 <img src="assets/logo.png" alt="Family Webs" style={{width: '60px', height: '60px', objectFit: 'contain'}} />
@@ -1798,12 +1808,21 @@
                     </header>
 
                     <div className="main-content">
-                        <aside className="sidebar">
+                        {showMobileMenu && <div className="mobile-overlay" onClick={() => setShowMobileMenu(false)} />}
+
+                        <aside className={`sidebar ${showMobileMenu ? 'mobile-open' : ''}`}>
                             <div className="sidebar-header">
                                 <h2 className="sidebar-title">Family Members</h2>
+                                <button
+                                    className="mobile-close-button"
+                                    onClick={() => setShowMobileMenu(false)}
+                                    aria-label="Close menu"
+                                >
+                                    {Icons.close}
+                                </button>
                                 <div className="search-box">
                                     <span className="search-icon">{Icons.search}</span>
-                                    <input 
+                                    <input
                                         type="text"
                                         className="search-input"
                                         placeholder="Search people..."
@@ -1826,7 +1845,11 @@
                                             person={person}
                                             personId={personId}
                                             isSelected={selectedPerson === personId}
-                                            onClick={setSelectedPerson}
+                                            onClick={(id) => {
+                                                setSelectedPerson(id);
+                                                setShowMobileDetailPanel(true);
+                                                setShowMobileMenu(false);
+                                            }}
                                             isHomePerson={isHomePerson}
                                             relationship={relationship}
                                             onSetHomePerson={handleSetHomePerson}
@@ -1885,7 +1908,10 @@
                                         <FluidTreeWithReactFlow
                                             treeData={treeData}
                                             selectedPerson={selectedPerson}
-                                            onSelectPerson={setSelectedPerson}
+                                            onSelectPerson={(id) => {
+                                                setSelectedPerson(id);
+                                                setShowMobileDetailPanel(true);
+                                            }}
                                             getNodePositionsRef={getNodePositionsRef}
                                         />
                                     </div>
@@ -1894,7 +1920,10 @@
                                         <GenerationalView
                                             treeData={treeData}
                                             selectedPerson={selectedPerson}
-                                            onSelectPerson={setSelectedPerson}
+                                            onSelectPerson={(id) => {
+                                                setSelectedPerson(id);
+                                                setShowMobileDetailPanel(true);
+                                            }}
                                             getGenerationalViewStateRef={getGenerationalViewStateRef}
                                         />
                                     </div>
@@ -1923,16 +1952,33 @@
                             )}
                         </main>
 
+                        {isEditMode && (
+                            <div className="mobile-fab-container">
+                                <button
+                                    className="mobile-fab"
+                                    onClick={() => setShowAddPersonModal(true)}
+                                    title="Add Person"
+                                >
+                                    {Icons.plus}
+                                </button>
+                            </div>
+                        )}
+
                         {selectedPerson && treeData.people[selectedPerson] && (
-                            <DetailPanel 
-                                person={treeData.people[selectedPerson]}
-                                personId={selectedPerson}
-                                treeData={treeData}
-                                isEditMode={isEditMode}
-                                onUpdate={handleUpdatePerson}
-                                onClose={() => setSelectedPerson(null)}
-                                onSelectPerson={setSelectedPerson}
-                            />
+                            <>
+                                {showMobileDetailPanel && <div className="mobile-overlay" onClick={() => {setSelectedPerson(null); setShowMobileDetailPanel(false);}} />}
+                                <div className={`detail-panel ${showMobileDetailPanel ? 'mobile-open' : ''}`}>
+                                    <DetailPanel
+                                        person={treeData.people[selectedPerson]}
+                                        personId={selectedPerson}
+                                        treeData={treeData}
+                                        isEditMode={isEditMode}
+                                        onUpdate={handleUpdatePerson}
+                                        onClose={() => {setSelectedPerson(null); setShowMobileDetailPanel(false);}}
+                                        onSelectPerson={setSelectedPerson}
+                                    />
+                                </div>
+                            </>
                         )}
                     </div>
 
