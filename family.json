@@ -1,0 +1,58 @@
+{
+  "id": "sample-family",
+  "name": "Sample Family",
+  "createdAt": "2024-01-01T00:00:00Z",
+  "updatedAt": "2024-01-01T00:00:00Z",
+  "events": [
+    "$_BIRTH",
+    "$_MARRIED",
+    "$_LIVED_AT",
+    "$_DEATH"
+  ],
+  "attributes": [],
+  "people": {
+    "1": {
+      "name": "John",
+      "surname": "Smith",
+      "gender": "MALE",
+      "events": [
+        { "type": "$_BIRTH", "dateStart": "1960-05-12" },
+        { "type": "$_MARRIED", "dateStart": "1985-06-01", "comment": "Married Jane" }
+      ],
+      "information": "Patriarch who loves woodworking."
+    },
+    "2": {
+      "name": "Jane",
+      "surname": "Smith",
+      "maidenName": "Brown",
+      "gender": "FEMALE",
+      "events": [
+        { "type": "$_BIRTH", "dateStart": "1962-09-20" },
+        { "type": "$_MARRIED", "dateStart": "1985-06-01", "comment": "Married John" }
+      ],
+      "information": "Passionate gardener."
+    },
+    "3": {
+      "name": "Emily",
+      "surname": "Smith",
+      "gender": "FEMALE",
+      "events": [
+        { "type": "$_BIRTH", "dateStart": "1990-02-14" }
+      ],
+      "information": "Teacher and avid traveler."
+    },
+    "4": {
+      "name": "Michael",
+      "surname": "Smith",
+      "gender": "MALE",
+      "events": [
+        { "type": "$_BIRTH", "dateStart": "1993-11-03" }
+      ],
+      "information": "Musician in a local band."
+    }
+  },
+  "mariages": [
+    ["1", "2", "3", "4"]
+  ],
+  "homePerson": "1"
+}
