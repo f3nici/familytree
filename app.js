@@ -1347,34 +1347,35 @@
 
                         <div className="modal-body" style={{maxHeight: '60vh', overflowY: 'auto'}}>
                             <div className="detail-section">
-                                <h3 className="section-title">View-only experience</h3>
+                                <h3 className="section-title">Welcome</h3>
                                 <p style={{color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: '12px'}}>
-                                    This build is read-only. All data is loaded from the bundled <code>family.json</code> file, so there are no edit, import, or export controls. Update <code>family.json</code> directly to change what you see here.
+                                    This site is a simple way to browse our family tree. Everything is already filled in—just explore the names and relationships that matter to you.
                                 </p>
                             </div>
 
                             <div className="detail-section">
-                                <h3 className="section-title">Navigation</h3>
+                                <h3 className="section-title">Finding people</h3>
                                 <ul style={{color: 'var(--text-secondary)', lineHeight: 1.7, paddingLeft: '24px'}}>
-                                    <li style={{marginBottom: '8px'}}><strong>Search:</strong> Use the search box to quickly locate people in the sidebar.</li>
-                                    <li style={{marginBottom: '8px'}}><strong>Home person:</strong> Click the home icon (🏠) beside a person to set them as the reference for relationship labels.</li>
-                                    <li style={{marginBottom: '8px'}}><strong>Details:</strong> Select any person to view their life events and relationships.</li>
+                                    <li style={{marginBottom: '8px'}}><strong>Search:</strong> Use the box at the top of the list to jump to a name.</li>
+                                    <li style={{marginBottom: '8px'}}><strong>Select a person:</strong> Click any name to open their details. Click the <code>×</code> in the panel to close it again.</li>
+                                    <li style={{marginBottom: '8px'}}><strong>Home badge:</strong> A small house icon shows who the tree is centred on for relationship labels.</li>
                                 </ul>
                             </div>
 
                             <div className="detail-section">
-                                <h3 className="section-title">View modes</h3>
+                                <h3 className="section-title">Exploring the tree</h3>
                                 <ul style={{color: 'var(--text-secondary)', lineHeight: 1.7, paddingLeft: '24px'}}>
-                                    <li style={{marginBottom: '8px'}}><strong>Web View:</strong> Interactive relationship map. Drag to pan and scroll to zoom.</li>
-                                    <li style={{marginBottom: '8px'}}><strong>Generational View:</strong> Traditional layered tree by generation.</li>
+                                    <li style={{marginBottom: '8px'}}><strong>Web View:</strong> An interactive map. Drag to pan and scroll or pinch to zoom.</li>
+                                    <li style={{marginBottom: '8px'}}><strong>Generational View:</strong> A traditional layered tree. Scroll to move through generations.</li>
+                                    <li style={{marginBottom: '8px'}}><strong>Jump between relatives:</strong> In the details panel, tap any listed parent, spouse, child, or sibling to open their card.</li>
                                 </ul>
                             </div>
 
                             <div className="detail-section">
-                                <h3 className="section-title">Troubleshooting</h3>
+                                <h3 className="section-title">Tips</h3>
                                 <ul style={{color: 'var(--text-secondary)', lineHeight: 1.7, paddingLeft: '24px'}}>
-                                    <li style={{marginBottom: '8px'}}>If the tree is empty, confirm that <code>family.json</code> sits next to <code>index.html</code> and is valid JSON.</li>
-                                    <li style={{marginBottom: '8px'}}>Refreshing the page reloads the same <code>family.json</code> data.</li>
+                                    <li style={{marginBottom: '8px'}}>Use the tabs in the header to switch between Web and Generational views.</li>
+                                    <li style={{marginBottom: '8px'}}>If something looks odd, refreshing the page will reload the tree.</li>
                                 </ul>
                             </div>
                         </div>
@@ -1436,15 +1437,6 @@
 
                 loadLocalFamily();
             }, []);
-
-            useEffect(() => {
-                if (treeData && !selectedPerson) {
-                    const preferredPerson = treeData.homePerson || Object.keys(treeData.people || {})[0];
-                    if (preferredPerson) {
-                        setSelectedPerson(preferredPerson);
-                    }
-                }
-            }, [treeData, selectedPerson]);
 
             useEffect(() => {
                 const handleResize = () => setIsMobile(window.innerWidth <= 900);
@@ -1718,18 +1710,6 @@
                                 >
                                     👥 Generational View
                                 </button>
-                            </div>
-
-                            <div
-                                style={{
-                                    padding: '10px 16px',
-                                    background: 'var(--bg-selected)',
-                                    borderRadius: '999px',
-                                    fontWeight: '600',
-                                    color: 'var(--primary)'
-                                }}
-                            >
-                                View Only Mode
                             </div>
 
                             <button
