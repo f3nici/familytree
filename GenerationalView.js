@@ -137,7 +137,9 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                 const p2Gen = personGeneration.get(parent2) ?? 0;
 
                 // Always prioritise spouses sharing the same generation before
-                // pushing children downward.
+                // pushing children downward. When a spouse is raised to match
+                // their partner, pull their parents closer so they sit only one
+                // generation above the unified couple.
                 const unifiedGen = Math.max(p1Gen, p2Gen);
 
                 if (p1Gen !== unifiedGen) {
@@ -149,6 +151,23 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                     personGeneration.set(parent2, unifiedGen);
                     changed = true;
                 }
+
+                const unifyParentsToCouple = (personId) => {
+                    const parents = childToParents.get(personId);
+                    if (!parents) return;
+
+                    parents.forEach(parentId => {
+                        const currentGen = personGeneration.get(parentId) ?? 0;
+                        const targetGen = Math.max(currentGen, Math.max(unifiedGen - 1, 0));
+                        if (currentGen !== targetGen) {
+                            personGeneration.set(parentId, targetGen);
+                            changed = true;
+                        }
+                    });
+                };
+
+                unifyParentsToCouple(parent1);
+                unifyParentsToCouple(parent2);
 
                 const childGen = unifiedGen + 1;
                 children.forEach(childId => {
