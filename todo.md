@@ -6,5 +6,6 @@ The UI needs to have some changes:
 - Only show as View only mode - Remove the toggle as there will be no edit options.
 - On Web view remove the Regenerate button
 - Remove the Export and Import Buttons
+- Update help menu to suit
 
 Remove all features that wont be needed for this.
