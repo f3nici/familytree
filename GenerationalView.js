@@ -489,7 +489,7 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
         return { x: vSeg.x, y: hSeg.y };
     };
 
-    const addJumpToPath = (path, jumpX, jumpY, jumpHeight = 15) => {
+    const addJumpToPath = (path, jumpX, jumpY, jumpHeight = 25) => {
         // Add a small arc (jump) to a path at the specified point
         const commands = path.match(/[MLQ]\s*[^MLQ]+/g) || [];
         let newPath = '';
@@ -517,13 +517,15 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                 if (!foundJumpPoint &&
                     Math.abs(newY - currentY) < 0.1 &&
                     Math.abs(currentY - jumpY) < 0.1 &&
-                    jumpX > Math.min(currentX, newX) &&
-                    jumpX < Math.max(currentX, newX)) {
+                    jumpX >= Math.min(currentX, newX) &&
+                    jumpX <= Math.max(currentX, newX)) {
 
                     // Add jump arc using quadratic bezier curve
-                    const jumpWidth = 15; // Width of the jump arc
+                    const jumpWidth = 25; // Width of the jump arc
                     const beforeJumpX = jumpX - jumpWidth / 2;
                     const afterJumpX = jumpX + jumpWidth / 2;
+
+                    console.log('  Replacing segment from', currentX.toFixed(1), 'to', newX.toFixed(1), 'with jump at', jumpX.toFixed(1));
 
                     // Line to start of jump
                     newPath += `L ${beforeJumpX} ${currentY} `;
@@ -532,7 +534,6 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                     // Continue to end point
                     newPath += `L ${newX} ${newY} `;
                     foundJumpPoint = true;
-                    console.log('  Added Q command for jump at x=' + jumpX.toFixed(1));
                 } else {
                     newPath += `L ${newX} ${newY} `;
                 }
@@ -541,6 +542,10 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                 currentY = newY;
             }
         });
+
+        if (!foundJumpPoint) {
+            console.log('  WARNING: Jump point not found in path! Looking for x=' + jumpX.toFixed(1) + ' y=' + jumpY.toFixed(1));
+        }
 
         return newPath.trim();
     };
