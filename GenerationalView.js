@@ -489,12 +489,14 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
         return { x: vSeg.x, y: hSeg.y };
     };
 
-    const addJumpToPath = (path, jumpX, jumpY, jumpHeight = 25) => {
-        // Add a small arc (jump) to a path at the specified point
+    const addMultipleJumpsToPath = (path, jumpPoints, jumpHeight = 25) => {
+        // Add multiple jump arcs to a path at specified points
+        // jumpPoints is an array of {x, y} objects
+        if (jumpPoints.length === 0) return path;
+
         const commands = path.match(/[MLQ]\s*[^MLQ]+/g) || [];
         let newPath = '';
         let currentX = 0, currentY = 0;
-        let foundJumpPoint = false;
 
         commands.forEach((cmd, idx) => {
             const type = cmd[0];
@@ -513,27 +515,44 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                 const newX = coords[0];
                 const newY = coords[1];
 
-                // Check if this horizontal segment contains the jump point
-                if (!foundJumpPoint &&
-                    Math.abs(newY - currentY) < 0.1 &&
-                    Math.abs(currentY - jumpY) < 0.1 &&
-                    jumpX >= Math.min(currentX, newX) &&
-                    jumpX <= Math.max(currentX, newX)) {
+                // Check if this is a horizontal segment
+                if (Math.abs(newY - currentY) < 0.1) {
+                    // Find all jump points on this segment
+                    const jumpsOnThisSegment = jumpPoints.filter(jp =>
+                        Math.abs(currentY - jp.y) < 0.1 &&
+                        jp.x >= Math.min(currentX, newX) &&
+                        jp.x <= Math.max(currentX, newX)
+                    );
 
-                    // Add jump arc using quadratic bezier curve
-                    const jumpWidth = 25; // Width of the jump arc
-                    const beforeJumpX = jumpX - jumpWidth / 2;
-                    const afterJumpX = jumpX + jumpWidth / 2;
+                    if (jumpsOnThisSegment.length > 0) {
+                        // Sort jumps by X coordinate (left to right if currentX < newX, right to left otherwise)
+                        const sortedJumps = [...jumpsOnThisSegment].sort((a, b) =>
+                            currentX < newX ? a.x - b.x : b.x - a.x
+                        );
 
-                    console.log('  Replacing segment from', currentX.toFixed(1), 'to', newX.toFixed(1), 'with jump at', jumpX.toFixed(1));
+                        console.log('  Segment from', currentX.toFixed(1), 'to', newX.toFixed(1), 'has', sortedJumps.length, 'jumps');
 
-                    // Line to start of jump
-                    newPath += `L ${beforeJumpX} ${currentY} `;
-                    // Quadratic curve for the jump (arc upward)
-                    newPath += `Q ${jumpX} ${currentY - jumpHeight} ${afterJumpX} ${currentY} `;
-                    // Continue to end point
-                    newPath += `L ${newX} ${newY} `;
-                    foundJumpPoint = true;
+                        // Build the segment with all jumps
+                        let segmentStartX = currentX;
+                        const jumpWidth = 25;
+
+                        sortedJumps.forEach(jp => {
+                            const beforeJumpX = jp.x - jumpWidth / 2;
+                            const afterJumpX = jp.x + jumpWidth / 2;
+
+                            // Line to start of jump
+                            newPath += `L ${beforeJumpX} ${currentY} `;
+                            // Quadratic curve for the jump (arc upward)
+                            newPath += `Q ${jp.x} ${currentY - jumpHeight} ${afterJumpX} ${currentY} `;
+
+                            segmentStartX = afterJumpX;
+                        });
+
+                        // Line to end of segment
+                        newPath += `L ${newX} ${newY} `;
+                    } else {
+                        newPath += `L ${newX} ${newY} `;
+                    }
                 } else {
                     newPath += `L ${newX} ${newY} `;
                 }
@@ -542,10 +561,6 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                 currentY = newY;
             }
         });
-
-        if (!foundJumpPoint) {
-            console.log('  WARNING: Jump point not found in path! Looking for x=' + jumpX.toFixed(1) + ' y=' + jumpY.toFixed(1));
-        }
 
         return newPath.trim();
     };
@@ -696,22 +711,19 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                 });
             }
 
-            // Apply all jumps to this line
+            // Apply all jumps to this line at once
             if (jumpsForThisLine.length > 0) {
                 console.log('Line', line.key, '(' + line.type + ') has', jumpsForThisLine.length, 'intersections to jump over');
-                console.log('  Original path:', line.path);
-
                 jumpsForThisLine.forEach(({ intersection, otherLineKey, otherLineType }) => {
-                    console.log('  Applying jump over', otherLineKey, '(' + otherLineType + ') at x=' + intersection.x.toFixed(1), 'y=' + intersection.y.toFixed(1));
-                    const beforePath = modifiedPath;
-                    modifiedPath = addJumpToPath(modifiedPath, intersection.x, intersection.y);
-                    if (beforePath === modifiedPath) {
-                        console.log('    ERROR: Path was not modified!');
-                    }
-                    totalJumps++;
+                    console.log('  Jump over', otherLineKey, '(' + otherLineType + ') at x=' + intersection.x.toFixed(1), 'y=' + intersection.y.toFixed(1));
                 });
 
-                console.log('  Final path:', modifiedPath);
+                // Extract just the intersection points
+                const jumpPoints = jumpsForThisLine.map(j => j.intersection);
+
+                // Apply all jumps in a single pass
+                modifiedPath = addMultipleJumpsToPath(line.path, jumpPoints);
+                totalJumps += jumpsForThisLine.length;
             }
 
             return {
