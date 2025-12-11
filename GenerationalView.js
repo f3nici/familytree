@@ -700,10 +700,6 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                 if (i === lineIdx) continue; // Skip self
 
                 const otherLine = lines[i];
-
-                // Skip if both are parent lines (children lines crossing children lines)
-                if (line.type === 'parent' && otherLine.type === 'parent') continue;
-
                 const otherSegments = extractSegments(otherLine.path);
 
                 // Check each horizontal segment in current line against other line's vertical segments
@@ -711,7 +707,21 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                     otherSegments.vertical.forEach(vSeg => {
                         const intersection = findHorizontalVerticalIntersection(hSeg, vSeg);
                         if (intersection !== null) {
-                            jumpsForThisLine.push({ intersection, otherLineKey: otherLine.key, otherLineType: otherLine.type });
+                            // Check if this is a corner (segments connecting at their endpoints)
+                            const isHorizontalEndpoint =
+                                Math.abs(intersection.x - hSeg.x1) < 0.1 ||
+                                Math.abs(intersection.x - hSeg.x2) < 0.1;
+                            const isVerticalEndpoint =
+                                Math.abs(intersection.y - vSeg.y1) < 0.1 ||
+                                Math.abs(intersection.y - vSeg.y2) < 0.1;
+
+                            const isCorner = isHorizontalEndpoint && isVerticalEndpoint;
+
+                            if (!isCorner) {
+                                jumpsForThisLine.push({ intersection, otherLineKey: otherLine.key, otherLineType: otherLine.type });
+                            } else {
+                                console.log('  Skipping corner at x=' + intersection.x.toFixed(1), 'y=' + intersection.y.toFixed(1));
+                            }
                         }
                     });
                 });
