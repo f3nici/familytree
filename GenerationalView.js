@@ -525,34 +525,36 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                     );
 
                     if (jumpsOnThisSegment.length > 0) {
-                        // Sort jumps by X coordinate (left to right if currentX < newX, right to left otherwise)
+                        // Determine direction of travel
+                        const goingLeftToRight = currentX < newX;
+
+                        // Sort jumps by X coordinate based on travel direction
                         const sortedJumps = [...jumpsOnThisSegment].sort((a, b) =>
-                            currentX < newX ? a.x - b.x : b.x - a.x
+                            goingLeftToRight ? a.x - b.x : b.x - a.x
                         );
 
-                        console.log('  Segment from', currentX.toFixed(1), 'to', newX.toFixed(1), 'has', sortedJumps.length, 'jumps');
+                        console.log('  Segment from', currentX.toFixed(1), 'to', newX.toFixed(1), 'has', sortedJumps.length, 'jumps (direction:', goingLeftToRight ? 'L→R' : 'R→L', ')');
 
-                        // Build the segment with all jumps, tracking position after each jump
-                        let lastX = currentX;
                         const jumpWidth = 25;
 
                         sortedJumps.forEach((jp, jumpIdx) => {
-                            const beforeJumpX = jp.x - jumpWidth / 2;
-                            const afterJumpX = jp.x + jumpWidth / 2;
+                            const leftSide = jp.x - jumpWidth / 2;
+                            const rightSide = jp.x + jumpWidth / 2;
 
-                            console.log('    Jump', jumpIdx + 1, 'at x=' + jp.x.toFixed(1), ': line from', lastX.toFixed(1), 'to', beforeJumpX.toFixed(1), 'then arc to', afterJumpX.toFixed(1));
-
-                            // Line from last position to start of this jump
-                            newPath += `L ${beforeJumpX} ${currentY} `;
-                            // Quadratic curve for the jump (arc upward)
-                            newPath += `Q ${jp.x} ${currentY - jumpHeight} ${afterJumpX} ${currentY} `;
-
-                            // Update position to end of this jump
-                            lastX = afterJumpX;
+                            if (goingLeftToRight) {
+                                // Traveling left to right: enter from left, exit on right
+                                console.log('    Jump', jumpIdx + 1, 'at x=' + jp.x.toFixed(1), ': L→R arc from', leftSide.toFixed(1), 'to', rightSide.toFixed(1));
+                                newPath += `L ${leftSide} ${currentY} `;
+                                newPath += `Q ${jp.x} ${currentY - jumpHeight} ${rightSide} ${currentY} `;
+                            } else {
+                                // Traveling right to left: enter from right, exit on left
+                                console.log('    Jump', jumpIdx + 1, 'at x=' + jp.x.toFixed(1), ': R→L arc from', rightSide.toFixed(1), 'to', leftSide.toFixed(1));
+                                newPath += `L ${rightSide} ${currentY} `;
+                                newPath += `Q ${jp.x} ${currentY - jumpHeight} ${leftSide} ${currentY} `;
+                            }
                         });
 
                         // Line from last jump to end of segment
-                        console.log('    Final line from', lastX.toFixed(1), 'to', newX.toFixed(1));
                         newPath += `L ${newX} ${newY} `;
                     } else {
                         newPath += `L ${newX} ${newY} `;
