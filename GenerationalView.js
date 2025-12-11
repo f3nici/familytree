@@ -1013,7 +1013,8 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                                     position: 'absolute',
                                     left: `${pos.x}px`,
                                     top: `${pos.y}px`,
-                                    width: `${pos.width}px`
+                                    width: `${pos.width}px`,
+                                    height: `${pos.height}px`
                                 }}
                                 onClick={(e) => {
                                     e.stopPropagation();
