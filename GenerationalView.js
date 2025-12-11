@@ -637,6 +637,7 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
         });
 
         // Apply jump effect where horizontal lines cross
+        let totalJumps = 0;
         const processedLines = lines.map((line, lineIdx) => {
             const segments = extractHorizontalSegments(line.path);
             let modifiedPath = line.path;
@@ -651,8 +652,10 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                     otherSegments.forEach(otherSeg => {
                         const intersectionX = findHorizontalIntersections(seg, otherSeg);
                         if (intersectionX !== null) {
+                            console.log('Jump:', line.key, 'over', otherLine.key, 'at x=' + intersectionX.toFixed(1), 'y=' + seg.y.toFixed(1));
                             // Add jump to the current line (it jumps over the earlier line)
                             modifiedPath = addJumpToPath(modifiedPath, intersectionX, seg.y);
+                            totalJumps++;
                         }
                     });
                 });
@@ -664,6 +667,9 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
             };
         });
 
+        if (totalJumps > 0) {
+            console.log('Applied', totalJumps, 'jump effects to marriage lines');
+        }
         return processedLines;
     }, [layout, treeData, selectedPerson]);
 
