@@ -264,6 +264,7 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
 
         const positions = new Map();
         const calculatedMarriageNodePositions = new Map();
+        const customMarriageY = new Set();
 
         const initialPositions = new Map();
         const initialMarriagePositions = new Map();
@@ -347,7 +348,6 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
 
                 let xPos = pos.x;
                 let yPos = pos.y + yOffset;
-
                 if (parent1Pos && parent2Pos) {
                     const parent1CenterX = parent1Pos.x + CARD_WIDTH / 2;
                     const parent2CenterX = parent2Pos.x + CARD_WIDTH / 2;
@@ -361,7 +361,10 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                 const customPos = marriageNodePositions.get(nodeId);
                 if (customPos) {
                     xPos = customPos.x;
-                    yPos = customPos.y;
+                    if (typeof customPos.y === 'number') {
+                        yPos = customPos.y;
+                        customMarriageY.add(nodeId);
+                    }
                 }
 
                 calculatedMarriageNodePositions.set(nodeId, {
@@ -396,18 +399,14 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
 
                 marriages.forEach((marriage, stackIndex) => {
                     if (!adjustedMarriages.has(marriage.marriageId)) {
-                        // Skip auto-adjustment if there's a custom position
-                        const hasCustomPosition = marriageNodePositions.has(marriage.marriageId);
-                        if (!hasCustomPosition) {
-                            const marriagePos = calculatedMarriageNodePositions.get(marriage.marriageId);
+                        const marriagePos = calculatedMarriageNodePositions.get(marriage.marriageId);
 
-                            if (marriagePos) {
-                                const personPos = positions.get(personId);
-                                if (personPos) {
-                                    const offset = MARRIAGE_BASE_OFFSET + (stackIndex * MARRIAGE_STACK_OFFSET);
-                                    marriagePos.y = personPos.y + CARD_HEIGHT + offset;
-                                    adjustedMarriages.add(marriage.marriageId);
-                                }
+                        if (marriagePos && !customMarriageY.has(marriage.marriageId)) {
+                            const personPos = positions.get(personId);
+                            if (personPos) {
+                                const offset = MARRIAGE_BASE_OFFSET + (stackIndex * MARRIAGE_STACK_OFFSET);
+                                marriagePos.y = personPos.y + CARD_HEIGHT + offset;
+                                adjustedMarriages.add(marriage.marriageId);
                             }
                         }
                     }
