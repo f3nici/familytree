@@ -670,6 +670,10 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                 });
             }
 
+            if (modifiedPath !== line.path && modifiedPath.includes('Q')) {
+                console.log('Modified path for', line.key + ':', modifiedPath);
+            }
+
             return {
                 ...line,
                 path: modifiedPath
