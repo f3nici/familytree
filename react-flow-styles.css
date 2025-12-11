@@ -109,16 +109,16 @@
    ========================================== */
 
 .react-flow-marriage-node {
-    width: 20px;
-    height: 20px;
+    width: 30px;
+    height: 30px;
     position: relative;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .marriage-circle {
-    width: 20px;
-    height: 20px;
+    width: 30px;
+    height: 30px;
     background: linear-gradient(135deg, var(--accent-warm) 0%, #a67d4f 100%);
     border-radius: 50%;
     box-shadow: 0 2px 8px rgba(196, 149, 106, 0.4);
@@ -127,8 +127,8 @@
 }
 
 .react-flow-marriage-node:hover .marriage-circle {
-    transform: scale(1.3);
-    box-shadow: 0 4px 12px rgba(196, 149, 106, 0.6);
+    transform: scale(1.5);
+    box-shadow: 0 6px 16px rgba(196, 149, 106, 0.7);
 }
 
 .react-flow-marriage-node.selected .marriage-circle {
