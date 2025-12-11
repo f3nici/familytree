@@ -425,6 +425,105 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
         };
     }, [generationData, treeData, nodePositions, marriageNodePositions]);
 
+    // Helper functions for line jump effect
+    const extractHorizontalSegments = (path) => {
+        // Parse SVG path and extract horizontal line segments
+        const segments = [];
+        const commands = path.match(/[ML]\s*[^ML]+/g) || [];
+
+        let currentX = 0, currentY = 0;
+
+        commands.forEach(cmd => {
+            const type = cmd[0];
+            const coords = cmd.slice(1).trim().split(/\s+/).map(parseFloat);
+
+            if (type === 'M') {
+                currentX = coords[0];
+                currentY = coords[1];
+            } else if (type === 'L') {
+                const newX = coords[0];
+                const newY = coords[1];
+
+                // Check if this is a horizontal line (same Y)
+                if (Math.abs(newY - currentY) < 0.1) {
+                    segments.push({
+                        y: currentY,
+                        x1: Math.min(currentX, newX),
+                        x2: Math.max(currentX, newX)
+                    });
+                }
+
+                currentX = newX;
+                currentY = newY;
+            }
+        });
+
+        return segments;
+    };
+
+    const findHorizontalIntersections = (segment1, segment2) => {
+        // Check if two horizontal segments at the same Y level intersect
+        if (Math.abs(segment1.y - segment2.y) > 0.1) return null;
+
+        // Check if x ranges overlap
+        const overlapStart = Math.max(segment1.x1, segment2.x1);
+        const overlapEnd = Math.min(segment1.x2, segment2.x2);
+
+        if (overlapStart < overlapEnd) {
+            // They overlap - return the middle of the overlap
+            return (overlapStart + overlapEnd) / 2;
+        }
+
+        return null;
+    };
+
+    const addJumpToPath = (path, jumpX, jumpY, jumpHeight = 8) => {
+        // Add a small arc (jump) to a path at the specified point
+        const commands = path.match(/[ML]\s*[^ML]+/g) || [];
+        let newPath = '';
+        let currentX = 0, currentY = 0;
+
+        commands.forEach((cmd, idx) => {
+            const type = cmd[0];
+            const coords = cmd.slice(1).trim().split(/\s+/).map(parseFloat);
+
+            if (type === 'M') {
+                newPath += `M ${coords[0]} ${coords[1]} `;
+                currentX = coords[0];
+                currentY = coords[1];
+            } else if (type === 'L') {
+                const newX = coords[0];
+                const newY = coords[1];
+
+                // Check if this horizontal segment contains the jump point
+                if (Math.abs(newY - currentY) < 0.1 &&
+                    Math.abs(currentY - jumpY) < 0.1 &&
+                    jumpX > Math.min(currentX, newX) &&
+                    jumpX < Math.max(currentX, newX)) {
+
+                    // Add jump arc using quadratic bezier curve
+                    const jumpWidth = 15; // Width of the jump arc
+                    const beforeJumpX = jumpX - jumpWidth / 2;
+                    const afterJumpX = jumpX + jumpWidth / 2;
+
+                    // Line to start of jump
+                    newPath += `L ${beforeJumpX} ${currentY} `;
+                    // Quadratic curve for the jump (arc upward)
+                    newPath += `Q ${jumpX} ${currentY - jumpHeight} ${afterJumpX} ${currentY} `;
+                    // Continue to end point
+                    newPath += `L ${newX} ${newY} `;
+                } else {
+                    newPath += `L ${newX} ${newY} `;
+                }
+
+                currentX = newX;
+                currentY = newY;
+            }
+        });
+
+        return newPath.trim();
+    };
+
     const connectionLines = useMemo(() => {
         const lines = [];
         const { positions, marriageNodePositions, CARD_WIDTH, CARD_HEIGHT } = layout;
@@ -537,7 +636,35 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
             });
         });
 
-        return lines;
+        // Apply jump effect where horizontal lines cross
+        const processedLines = lines.map((line, lineIdx) => {
+            const segments = extractHorizontalSegments(line.path);
+            let modifiedPath = line.path;
+
+            // Check this line against all previous lines for crossings
+            for (let i = 0; i < lineIdx; i++) {
+                const otherLine = lines[i];
+                const otherSegments = extractHorizontalSegments(otherLine.path);
+
+                // Check each horizontal segment in current line against other line's segments
+                segments.forEach(seg => {
+                    otherSegments.forEach(otherSeg => {
+                        const intersectionX = findHorizontalIntersections(seg, otherSeg);
+                        if (intersectionX !== null) {
+                            // Add jump to the current line (it jumps over the earlier line)
+                            modifiedPath = addJumpToPath(modifiedPath, intersectionX, seg.y);
+                        }
+                    });
+                });
+            }
+
+            return {
+                ...line,
+                path: modifiedPath
+            };
+        });
+
+        return processedLines;
     }, [layout, treeData, selectedPerson]);
 
     const marriageNodes = useMemo(() => {
