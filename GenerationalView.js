@@ -425,9 +425,8 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
         };
     }, [generationData, treeData, nodePositions, marriageNodePositions]);
 
-    // Helper functions for line jump effect
+    // Extract horizontal and vertical segments from SVG path
     const extractSegments = (path) => {
-        // Parse SVG path and extract both horizontal and vertical line segments
         const horizontal = [];
         const vertical = [];
         const commands = path.match(/[MLQ]\s*[^MLQ]+/g) || [];
@@ -442,23 +441,19 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                 currentX = coords[0];
                 currentY = coords[1];
             } else if (type === 'Q') {
-                // Skip Q commands for segment extraction (they're from previous jumps)
                 currentX = coords[2];
                 currentY = coords[3];
             } else if (type === 'L') {
                 const newX = coords[0];
                 const newY = coords[1];
 
-                // Check if this is a horizontal line (same Y)
                 if (Math.abs(newY - currentY) < 0.1) {
                     horizontal.push({
                         y: currentY,
                         x1: Math.min(currentX, newX),
                         x2: Math.max(currentX, newX)
                     });
-                }
-                // Check if this is a vertical line (same X)
-                else if (Math.abs(newX - currentX) < 0.1) {
+                } else if (Math.abs(newX - currentX) < 0.1) {
                     vertical.push({
                         x: currentX,
                         y1: Math.min(currentY, newY),
@@ -474,24 +469,15 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
         return { horizontal, vertical };
     };
 
+    // Find intersection point between horizontal and vertical segments
     const findHorizontalVerticalIntersection = (hSeg, vSeg) => {
-        // Check if a horizontal segment crosses a vertical segment
-        // Horizontal segment: y constant, x ranges from x1 to x2
-        // Vertical segment: x constant, y ranges from y1 to y2
-
-        // Check if vertical line's X is within horizontal segment's X range
         if (vSeg.x < hSeg.x1 || vSeg.x > hSeg.x2) return null;
-
-        // Check if horizontal line's Y is within vertical segment's Y range
         if (hSeg.y < vSeg.y1 || hSeg.y > vSeg.y2) return null;
-
-        // They intersect at (vSeg.x, hSeg.y)
         return { x: vSeg.x, y: hSeg.y };
     };
 
+    // Add jump arcs to path at specified intersection points
     const addMultipleJumpsToPath = (path, jumpPoints, jumpHeight = 25) => {
-        // Add multiple jump arcs to a path at specified points
-        // jumpPoints is an array of {x, y} objects
         if (jumpPoints.length === 0) return path;
 
         const commands = path.match(/[MLQ]\s*[^MLQ]+/g) || [];
@@ -507,7 +493,6 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                 currentX = coords[0];
                 currentY = coords[1];
             } else if (type === 'Q') {
-                // Preserve existing quadratic curves from previous jumps
                 newPath += `Q ${coords[0]} ${coords[1]} ${coords[2]} ${coords[3]} `;
                 currentX = coords[2];
                 currentY = coords[3];
@@ -515,9 +500,7 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                 const newX = coords[0];
                 const newY = coords[1];
 
-                // Check if this is a horizontal segment
                 if (Math.abs(newY - currentY) < 0.1) {
-                    // Find all jump points on this segment
                     const jumpsOnThisSegment = jumpPoints.filter(jp =>
                         Math.abs(currentY - jp.y) < 0.1 &&
                         jp.x >= Math.min(currentX, newX) &&
@@ -525,15 +508,10 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                     );
 
                     if (jumpsOnThisSegment.length > 0) {
-                        // Determine direction of travel
                         const goingLeftToRight = currentX < newX;
-
-                        // Sort jumps by X coordinate based on travel direction
                         const sortedJumps = [...jumpsOnThisSegment].sort((a, b) =>
                             goingLeftToRight ? a.x - b.x : b.x - a.x
                         );
-
-                        console.log('  Segment from', currentX.toFixed(1), 'to', newX.toFixed(1), 'has', sortedJumps.length, 'jumps (direction:', goingLeftToRight ? 'L→R' : 'R→L', ')');
 
                         const jumpWidth = 25;
 
@@ -542,19 +520,14 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                             const rightSide = jp.x + jumpWidth / 2;
 
                             if (goingLeftToRight) {
-                                // Traveling left to right: enter from left, exit on right
-                                console.log('    Jump', jumpIdx + 1, 'at x=' + jp.x.toFixed(1), ': L→R arc from', leftSide.toFixed(1), 'to', rightSide.toFixed(1));
                                 newPath += `L ${leftSide} ${currentY} `;
                                 newPath += `Q ${jp.x} ${currentY - jumpHeight} ${rightSide} ${currentY} `;
                             } else {
-                                // Traveling right to left: enter from right, exit on left
-                                console.log('    Jump', jumpIdx + 1, 'at x=' + jp.x.toFixed(1), ': R→L arc from', rightSide.toFixed(1), 'to', leftSide.toFixed(1));
                                 newPath += `L ${rightSide} ${currentY} `;
                                 newPath += `Q ${jp.x} ${currentY - jumpHeight} ${leftSide} ${currentY} `;
                             }
                         });
 
-                        // Line from last jump to end of segment
                         newPath += `L ${newX} ${newY} `;
                     } else {
                         newPath += `L ${newX} ${newY} `;
@@ -683,81 +656,54 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
             });
         });
 
-        // Apply jump effect where lines cross vertically/horizontally
-        // Rules:
-        // - Marriage line crosses marriage line: apply jump
-        // - Marriage line crosses parent line: apply jump
-        // - Parent line crosses marriage line: apply jump
-        // - Parent line crosses parent line: DO NOT apply jump
-        let totalJumps = 0;
+        // Apply jump effect where lines cross (marriage-marriage, marriage-child, child-child from different marriages)
         const processedLines = lines.map((line, lineIdx) => {
             const mySegments = extractSegments(line.path);
             let modifiedPath = line.path;
             const jumpsForThisLine = [];
 
-            // Check this line's horizontal segments against other lines' vertical segments
             for (let i = 0; i < lines.length; i++) {
-                if (i === lineIdx) continue; // Skip self
+                if (i === lineIdx) continue;
 
                 const otherLine = lines[i];
 
-                // Check if both are child lines from the same marriage (siblings)
-                // Child line keys are like: "marriage-to-child-{marriageIdx}-{childIdx}"
+                // Skip sibling lines (child lines from same marriage) to avoid jumps on overlapping segments
                 const isSiblingLines = line.type === 'parent' &&
                                       otherLine.type === 'parent' &&
                                       line.key.startsWith('marriage-to-child-') &&
                                       otherLine.key.startsWith('marriage-to-child-');
 
                 if (isSiblingLines) {
-                    // Extract marriage index from both keys
                     const lineMarriageIdx = line.key.split('-')[3];
                     const otherLineMarriageIdx = otherLine.key.split('-')[3];
-
-                    if (lineMarriageIdx === otherLineMarriageIdx) {
-                        // Same marriage - these are siblings, skip to avoid jumps on overlapping segments
-                        continue;
-                    }
+                    if (lineMarriageIdx === otherLineMarriageIdx) continue;
                 }
 
                 const otherSegments = extractSegments(otherLine.path);
 
-                // Check each horizontal segment in current line against other line's vertical segments
                 mySegments.horizontal.forEach(hSeg => {
                     otherSegments.vertical.forEach(vSeg => {
                         const intersection = findHorizontalVerticalIntersection(hSeg, vSeg);
                         if (intersection !== null) {
-                            // Check if this is a corner or near-corner
-                            // Add 5px deadzone at the top of vertical lines (minimum Y)
+                            // Skip corners: 5px deadzone at top of vertical lines, or horizontal endpoint within 15px of vertical top
                             const cornerDeadzone = 5;
                             const distanceFromVerticalTop = Math.abs(intersection.y - vSeg.y1);
                             const isNearVerticalTop = distanceFromVerticalTop < cornerDeadzone;
-
-                            // Also check if at horizontal endpoint
                             const isHorizontalEndpoint =
                                 Math.abs(intersection.x - hSeg.x1) < cornerDeadzone ||
                                 Math.abs(intersection.x - hSeg.x2) < cornerDeadzone;
-
                             const isCorner = isNearVerticalTop || (isHorizontalEndpoint && distanceFromVerticalTop < 15);
 
                             if (!isCorner) {
                                 jumpsForThisLine.push({ intersection, otherLineKey: otherLine.key, otherLineType: otherLine.type });
-                            } else {
-                                console.log('  Skipping corner/deadzone at x=' + intersection.x.toFixed(1), 'y=' + intersection.y.toFixed(1), '(dist from top:', distanceFromVerticalTop.toFixed(1) + ')');
                             }
                         }
                     });
                 });
             }
 
-            // Apply all jumps to this line at once
             if (jumpsForThisLine.length > 0) {
-                console.log('Line', line.key, '(' + line.type + ') has', jumpsForThisLine.length, 'intersections to jump over');
-                jumpsForThisLine.forEach(({ intersection, otherLineKey, otherLineType }) => {
-                    console.log('  Jump over', otherLineKey, '(' + otherLineType + ') at x=' + intersection.x.toFixed(1), 'y=' + intersection.y.toFixed(1));
-                });
-
-                // Extract intersection points and de-duplicate by position
-                // Multiple lines crossing at same point should only create one jump
+                // De-duplicate intersections at same position (multiple lines crossing at same point)
                 const uniqueJumpPoints = [];
                 const seenPositions = new Set();
 
@@ -769,11 +715,7 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                     }
                 });
 
-                console.log('  De-duplicated to', uniqueJumpPoints.length, 'unique jump positions');
-
-                // Apply all jumps in a single pass
                 modifiedPath = addMultipleJumpsToPath(line.path, uniqueJumpPoints);
-                totalJumps += uniqueJumpPoints.length;
             }
 
             return {
@@ -782,9 +724,6 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
             };
         });
 
-        if (totalJumps > 0) {
-            console.log('Applied', totalJumps, 'jump effects');
-        }
         return processedLines;
     }, [layout, treeData, selectedPerson]);
 
