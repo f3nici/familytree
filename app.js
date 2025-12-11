@@ -274,6 +274,72 @@
             homePerson: null
         };
 
+        const sampleTreeData = {
+            id: 'sample-tree',
+            createdAt: '2024-01-01T00:00:00.000Z',
+            updatedAt: '2024-01-01T00:00:00.000Z',
+            name: 'Sample Family',
+            events: [
+                "$_BIRTH",
+                "$_MARRIED",
+                "$_LIVED_AT",
+                "$_DEATH"
+            ],
+            attributes: [],
+            people: {
+                alex: {
+                    name: 'Alex',
+                    surname: 'Johnson',
+                    gender: 'MALE',
+                    events: [
+                        {
+                            type: '$_BIRTH',
+                            dateStart: '1975-03-12',
+                            description: 'Born in Sydney'
+                        }
+                    ]
+                },
+                taylor: {
+                    name: 'Taylor',
+                    surname: 'Johnson',
+                    gender: 'FEMALE',
+                    events: [
+                        {
+                            type: '$_BIRTH',
+                            dateStart: '1978-07-04',
+                            description: 'Born in Auckland'
+                        }
+                    ]
+                },
+                sam: {
+                    name: 'Sam',
+                    surname: 'Johnson',
+                    gender: 'MALE',
+                    events: [
+                        {
+                            type: '$_BIRTH',
+                            dateStart: '2002-11-02'
+                        }
+                    ]
+                },
+                riley: {
+                    name: 'Riley',
+                    surname: 'Johnson',
+                    gender: 'FEMALE',
+                    events: [
+                        {
+                            type: '$_BIRTH',
+                            dateStart: '2006-05-19'
+                        }
+                    ]
+                }
+            },
+            mariages: [
+                ['alex', 'taylor', 'sam', 'riley']
+            ],
+            homePerson: 'sam'
+        };
+
         const PersonCard = ({ person, personId, isSelected, onClick, isEditMode, compact = false, isHomePerson = false, relationship = null }) => {
             const birthEvent = person.events?.find(e => e.type === '$_BIRTH');
             const deathEvent = person.events?.find(e => e.type === '$_DEATH');
@@ -1421,17 +1487,31 @@
 
             useEffect(() => {
                 const loadFamilyFile = async () => {
+                    const useSampleData = (message = '') => {
+                        setTreeData(sampleTreeData);
+                        setSelectedPerson(sampleTreeData.homePerson || null);
+                        if (message) {
+                            setLoadError(message);
+                        }
+                    };
+
                     try {
                         const response = await fetch('family.json', { cache: 'no-store' });
                         if (!response.ok) {
-                            throw new Error('family.json not found');
+                            throw new Error(`family.json request failed with status ${response.status}`);
                         }
                         const data = await response.json();
+                        if (!data?.people || Object.keys(data.people).length === 0) {
+                            useSampleData('family.json loaded but had no people to display. Showing a sample family instead.');
+                            return;
+                        }
                         setTreeData(data);
                         setSelectedPerson(data.homePerson || null);
                     } catch (error) {
                         console.error('Failed to load family.json', error);
-                        setLoadError('Could not load family.json. Place the file next to index.html and refresh.');
+                        const statusMatch = error.message.match(/status (\d+)/);
+                        const statusText = statusMatch ? ` (received ${statusMatch[1]})` : '';
+                        useSampleData(`Could not load family.json${statusText}. Make sure it sits next to index.html and the server allows access. Showing sample data.`);
                     } finally {
                         setIsLoadingData(false);
                     }
@@ -1510,7 +1590,7 @@
                 );
             }
 
-            if (loadError || !treeData) {
+            if (!treeData) {
                 return (
                     <div className="app-container">
                         <div className="welcome-screen">
@@ -1600,6 +1680,25 @@
                             </button>
                         </div>
                     </header>
+
+                    {loadError && (
+                        <div
+                            style={{
+                                background: 'rgba(234, 179, 8, 0.15)',
+                                color: 'var(--text-primary)',
+                                border: '1px solid rgba(234, 179, 8, 0.4)',
+                                padding: '12px 16px',
+                                borderRadius: '12px',
+                                margin: '0 0 12px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '10px'
+                            }}
+                        >
+                            <span role="img" aria-label="warning" style={{fontSize: '1.2rem'}}>⚠️</span>
+                            <span style={{lineHeight: 1.4}}>{loadError}</span>
+                        </div>
+                    )}
 
                     <div className="main-content">
                         {showMobileMenu && <div className="mobile-overlay" onClick={() => setShowMobileMenu(false)} />}

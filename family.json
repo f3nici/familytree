@@ -1,0 +1,36 @@
+{
+  "id": "sample-tree",
+  "createdAt": "2024-01-01T00:00:00.000Z",
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "name": "Sample Family",
+  "events": ["$_BIRTH", "$_MARRIED", "$_LIVED_AT", "$_DEATH"],
+  "attributes": [],
+  "people": {
+    "alex": {
+      "name": "Alex",
+      "surname": "Johnson",
+      "gender": "MALE",
+      "events": [{"type": "$_BIRTH", "dateStart": "1975-03-12", "description": "Born in Sydney"}]
+    },
+    "taylor": {
+      "name": "Taylor",
+      "surname": "Johnson",
+      "gender": "FEMALE",
+      "events": [{"type": "$_BIRTH", "dateStart": "1978-07-04", "description": "Born in Auckland"}]
+    },
+    "sam": {
+      "name": "Sam",
+      "surname": "Johnson",
+      "gender": "MALE",
+      "events": [{"type": "$_BIRTH", "dateStart": "2002-11-02"}]
+    },
+    "riley": {
+      "name": "Riley",
+      "surname": "Johnson",
+      "gender": "FEMALE",
+      "events": [{"type": "$_BIRTH", "dateStart": "2006-05-19"}]
+    }
+  },
+  "mariages": [["alex", "taylor", "sam", "riley"]],
+  "homePerson": "sam"
+}
