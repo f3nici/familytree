@@ -96,84 +96,90 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
             personGeneration.set(rootId, 0);
         });
 
-        const normalizeGenerations = () => {
-            let changed = true;
-            let iterations = 0;
-            const maxIterations = 100;
+        const generationCache = new Map();
+        const visitStack = new Set();
 
-            while (changed && iterations < maxIterations) {
-                changed = false;
-                iterations++;
+        const resolveGeneration = (personId) => {
+            if (generationCache.has(personId)) return generationCache.get(personId);
+            if (visitStack.has(personId)) return 0; // Prevent cycles from breaking recursion
 
-                personToSpouses.forEach((spouses, personId) => {
-                    if (!personGeneration.has(personId)) return;
+            visitStack.add(personId);
 
-                    const personGen = personGeneration.get(personId);
-                    spouses.forEach(spouseId => {
-                        if (!personGeneration.has(spouseId)) {
-                            personGeneration.set(spouseId, personGen);
-                            changed = true;
-                        } else if (personGeneration.get(spouseId) !== personGen) {
-                            const minGen = Math.min(personGen, personGeneration.get(spouseId));
-                            personGeneration.set(personId, minGen);
-                            personGeneration.set(spouseId, minGen);
+            let gen = 0;
+            const parents = childToParents.get(personId);
+            if (parents) {
+                const parentGens = parents.map(resolveGeneration);
+                gen = Math.max(...parentGens) + 1;
+            }
+
+            visitStack.delete(personId);
+            generationCache.set(personId, gen);
+            return gen;
+        };
+
+        allPeople.forEach(personId => {
+            personGeneration.set(personId, resolveGeneration(personId));
+        });
+
+        let changed = true;
+        let iterations = 0;
+        const maxIterations = 100;
+
+        while (changed && iterations < maxIterations) {
+            changed = false;
+            iterations++;
+
+            treeData.mariages.forEach((marriage) => {
+                if (marriage.length < 2) return;
+                const [parent1, parent2, ...children] = marriage;
+
+                const p1Gen = personGeneration.get(parent1) ?? 0;
+                const p2Gen = personGeneration.get(parent2) ?? 0;
+
+                // Always prioritise spouses sharing the same generation before
+                // pushing children downward. When a spouse is raised to match
+                // their partner, pull their parents closer so they sit only one
+                // generation above the unified couple.
+                const unifiedGen = Math.max(p1Gen, p2Gen);
+
+                if (p1Gen !== unifiedGen) {
+                    personGeneration.set(parent1, unifiedGen);
+                    changed = true;
+                }
+
+                if (p2Gen !== unifiedGen) {
+                    personGeneration.set(parent2, unifiedGen);
+                    changed = true;
+                }
+
+                const unifyParentsToCouple = (personId) => {
+                    const parents = childToParents.get(personId);
+                    if (!parents) return;
+
+                    parents.forEach(parentId => {
+                        const currentGen = personGeneration.get(parentId) ?? 0;
+                        const targetGen = Math.max(currentGen, Math.max(unifiedGen - 1, 0));
+                        if (currentGen !== targetGen) {
+                            personGeneration.set(parentId, targetGen);
                             changed = true;
                         }
                     });
-                });
+                };
 
-                childToParents.forEach((parents, childId) => {
-                    const [parent1, parent2] = parents;
+                unifyParentsToCouple(parent1);
+                unifyParentsToCouple(parent2);
 
-                    if (!personGeneration.has(parent1) || !personGeneration.has(parent2)) {
-                        return;
-                    }
-
-                    const p1Gen = personGeneration.get(parent1);
-                    const p2Gen = personGeneration.get(parent2);
-
-                    if (p1Gen !== p2Gen) {
-                        const minGen = Math.min(p1Gen, p2Gen);
-                        personGeneration.set(parent1, minGen);
-                        personGeneration.set(parent2, minGen);
+                const childGen = unifiedGen + 1;
+                children.forEach(childId => {
+                    const currentGen = personGeneration.get(childId) ?? 0;
+                    const targetGen = Math.max(currentGen, childGen);
+                    if (currentGen !== targetGen) {
+                        personGeneration.set(childId, targetGen);
                         changed = true;
                     }
-
-                    const parentGen = personGeneration.get(parent1);
-                    const childGen = parentGen + 1;
-
-                    if (!personGeneration.has(childId)) {
-                        personGeneration.set(childId, childGen);
-                        changed = true;
-                    } else if (personGeneration.get(childId) !== childGen) {
-                        const currentChildGen = personGeneration.get(childId);
-
-                        if (currentChildGen < childGen) {
-                            const newParentGen = currentChildGen - 1;
-                            personGeneration.set(parent1, newParentGen);
-                            personGeneration.set(parent2, newParentGen);
-                            changed = true;
-                        } else {
-                            personGeneration.set(childId, childGen);
-                            changed = true;
-                        }
-                    }
                 });
-
-                personGeneration.forEach((gen, personId) => {
-                    if (personToSpouses.has(personId)) {
-                        personToSpouses.get(personId).forEach(spouseId => {
-                            if (!personGeneration.has(spouseId) || personGeneration.get(spouseId) !== gen) {
-                                personGeneration.set(spouseId, gen);
-                                changed = true;
-                            }
-                        });
-                    }
-                });
-            }
-        };
-
-        normalizeGenerations();
+            });
+        }
 
         allPeople.forEach(personId => {
             if (!personGeneration.has(personId)) {
@@ -297,22 +303,32 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
             generationYOffsets.set(gen + 1, cumulativeOffset);
         });
 
+        const generationBaseY = new Map();
+        initialPositions.forEach(pos => {
+            const gen = pos.generation || 0;
+            const currentBase = generationBaseY.get(gen);
+            if (currentBase === undefined || pos.y < currentBase) {
+                generationBaseY.set(gen, pos.y);
+            }
+        });
+
         initialPositions.forEach((pos, nodeId) => {
             const gen = pos.generation || 0;
             const yOffset = generationYOffsets.get(gen) || 0;
+            const baseY = generationBaseY.get(gen) ?? pos.y;
 
             const customPos = nodePositions.get(nodeId);
             if (customPos) {
                 positions.set(nodeId, {
                     x: customPos.x,
-                    y: pos.y + yOffset,
+                    y: baseY + yOffset,
                     width: CARD_WIDTH,
                     height: CARD_HEIGHT
                 });
             } else {
                 positions.set(nodeId, {
                     x: pos.x,
-                    y: pos.y + yOffset,
+                    y: baseY + yOffset,
                     width: CARD_WIDTH,
                     height: CARD_HEIGHT
                 });
@@ -336,6 +352,10 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                     const parent1CenterX = parent1Pos.x + CARD_WIDTH / 2;
                     const parent2CenterX = parent2Pos.x + CARD_WIDTH / 2;
                     xPos = (parent1CenterX + parent2CenterX) / 2;
+
+                    const parent1BottomY = parent1Pos.y + CARD_HEIGHT;
+                    const parent2BottomY = parent2Pos.y + CARD_HEIGHT;
+                    yPos = (parent1BottomY + parent2BottomY) / 2;
                 }
 
                 const customPos = marriageNodePositions.get(nodeId);
