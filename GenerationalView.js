@@ -672,6 +672,7 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
         const processedLines = lines.map((line, lineIdx) => {
             const mySegments = extractSegments(line.path);
             let modifiedPath = line.path;
+            const jumpsForThisLine = [];
 
             // Check this line's horizontal segments against other lines' vertical segments
             for (let i = 0; i < lines.length; i++) {
@@ -689,17 +690,28 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                     otherSegments.vertical.forEach(vSeg => {
                         const intersection = findHorizontalVerticalIntersection(hSeg, vSeg);
                         if (intersection !== null) {
-                            console.log('Jump:', line.key, '(' + line.type + ') over', otherLine.key, '(' + otherLine.type + ') at x=' + intersection.x.toFixed(1), 'y=' + intersection.y.toFixed(1));
-                            // Add jump to the current line's horizontal segment
-                            modifiedPath = addJumpToPath(modifiedPath, intersection.x, intersection.y);
-                            totalJumps++;
+                            jumpsForThisLine.push({ intersection, otherLineKey: otherLine.key, otherLineType: otherLine.type });
                         }
                     });
                 });
             }
 
-            if (modifiedPath !== line.path) {
-                console.log('Modified line:', line.key, '(' + line.type + ')');
+            // Apply all jumps to this line
+            if (jumpsForThisLine.length > 0) {
+                console.log('Line', line.key, '(' + line.type + ') has', jumpsForThisLine.length, 'intersections to jump over');
+                console.log('  Original path:', line.path);
+
+                jumpsForThisLine.forEach(({ intersection, otherLineKey, otherLineType }) => {
+                    console.log('  Applying jump over', otherLineKey, '(' + otherLineType + ') at x=' + intersection.x.toFixed(1), 'y=' + intersection.y.toFixed(1));
+                    const beforePath = modifiedPath;
+                    modifiedPath = addJumpToPath(modifiedPath, intersection.x, intersection.y);
+                    if (beforePath === modifiedPath) {
+                        console.log('    ERROR: Path was not modified!');
+                    }
+                    totalJumps++;
+                });
+
+                console.log('  Final path:', modifiedPath);
             }
 
             return {
