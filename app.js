@@ -1415,7 +1415,7 @@
 
         const FamilyTreeApp = () => {
             const [treeData, setTreeData] = useState(null);
-            const [isEditMode, setIsEditMode] = useState(true);
+            const [isEditMode, setIsEditMode] = useState(false); // Force view-only mode
             const [selectedPerson, setSelectedPerson] = useState(null);
             const [searchQuery, setSearchQuery] = useState('');
             const [showAddPersonModal, setShowAddPersonModal] = useState(false);
@@ -1446,21 +1446,28 @@
             }, [treeData, searchQuery]);
 
             useEffect(() => {
-                const saved = localStorage.getItem('familyTreeData');
-                if (saved) {
-                    try {
-                        setTreeData(JSON.parse(saved));
-                    } catch (e) {
-                        console.error('Failed to parse saved data');
-                    }
-                }
+                // Load data from family.json file
+                fetch('family.json')
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Failed to load family.json');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        setTreeData(data);
+                    })
+                    .catch(error => {
+                        console.error('Error loading family data:', error);
+                    });
             }, []);
 
-            useEffect(() => {
-                if (treeData) {
-                    localStorage.setItem('familyTreeData', JSON.stringify(treeData));
-                }
-            }, [treeData]);
+            // Auto-save disabled in view-only mode
+            // useEffect(() => {
+            //     if (treeData) {
+            //         localStorage.setItem('familyTreeData', JSON.stringify(treeData));
+            //     }
+            // }, [treeData]);
 
             useEffect(() => {
                 const handleResize = () => setIsMobile(window.innerWidth <= 900);
@@ -1756,7 +1763,8 @@
                                 Create beautiful, interactive family trees that capture the complex relationships
                                 of your family including remarriages, half-siblings, and step-families.
                             </p>
-                            <div className="welcome-actions">
+                            {/* Welcome actions hidden in view-only mode */}
+                            {/* <div className="welcome-actions">
                                 <button className="btn btn-primary" onClick={handleNewTree}>
                                     {Icons.plus} Create New Tree
                                 </button>
@@ -1764,13 +1772,13 @@
                                     {Icons.upload} Import JSON
                                 </button>
                             </div>
-                            <input 
+                            <input
                                 ref={fileInputRef}
-                                type="file" 
+                                type="file"
                                 accept=".json"
                                 style={{display: 'none'}}
                                 onChange={handleFileUpload}
-                            />
+                            /> */}
                         </div>
                     </div>
                 );
@@ -1836,13 +1844,14 @@
                                 {theme === 'light' ? '🌙' : '☀️'}
                             </button>
 
-                            <div className="toggle-container">
+                            {/* Edit/View mode toggle hidden in view-only mode */}
+                            {/* <div className="toggle-container">
                                 <span className="toggle-label">{isEditMode ? 'Edit Mode' : 'View Only'}</span>
                                 <div
                                     className={`toggle-switch ${isEditMode ? 'active' : ''}`}
                                     onClick={() => setIsEditMode(!isEditMode)}
                                 />
-                            </div>
+                            </div> */}
 
                             <button
                                 className="btn btn-secondary"
@@ -1851,10 +1860,12 @@
                             >
                                 {Icons.help} Help
                             </button>
-                            <button className="btn btn-secondary" onClick={handleDownload}>
+                            {/* Export button hidden in view-only mode */}
+                            {/* <button className="btn btn-secondary" onClick={handleDownload}>
                                 {Icons.download} Export
-                            </button>
-                            <button className="btn btn-secondary" onClick={() => fileInputRef.current?.click()}>
+                            </button> */}
+                            {/* Import button hidden in view-only mode */}
+                            {/* <button className="btn btn-secondary" onClick={() => fileInputRef.current?.click()}>
                                 {Icons.upload} Import
                             </button>
                             <input
@@ -1863,7 +1874,7 @@
                                 accept=".json"
                                 style={{display: 'none'}}
                                 onChange={handleFileUpload}
-                            />
+                            /> */}
                         </div>
                     </header>
 
