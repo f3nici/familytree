@@ -1273,13 +1273,6 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                 >
                     ↻
                 </button>
-                <button
-                    className={`gen-control-btn ${!performanceMode ? 'active' : ''}`}
-                    onClick={() => setPerformanceMode(!performanceMode)}
-                    title={performanceMode ? "Enable animations (slower)" : "Performance mode (faster)"}
-                >
-                    {performanceMode ? '⚡' : '✨'}
-                </button>
             </div>
 
             {viewTransform && (
