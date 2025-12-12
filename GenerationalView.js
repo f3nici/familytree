@@ -4,7 +4,12 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
 
     const initialViewState = useMemo(() => {
         const savedState = treeData.viewState?.generationalView;
-        if (!savedState) return { viewTransform: null, nodePositions: new Map(), marriageNodePositions: new Map() };
+        if (!savedState) return {
+            viewTransform: null,
+            nodePositions: new Map(),
+            marriageNodePositions: new Map(),
+            performanceMode: true // Default to performance mode on
+        };
 
         const nodePositionsMap = new Map();
         if (savedState.nodePositions) {
@@ -23,7 +28,8 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
         return {
             viewTransform: savedState.viewTransform || null,
             nodePositions: nodePositionsMap,
-            marriageNodePositions: marriageNodePositionsMap
+            marriageNodePositions: marriageNodePositionsMap,
+            performanceMode: savedState.performanceMode !== undefined ? savedState.performanceMode : true
         };
     }, []);
 
@@ -38,6 +44,7 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
     const [lastTouchDistance, setLastTouchDistance] = useState(null);
     const [touchStart, setTouchStart] = useState(null);
     const [isLocked, setIsLocked] = useState(true);
+    const [performanceMode, setPerformanceMode] = useState(initialViewState.performanceMode);
 
     useEffect(() => {
         if (getGenerationalViewStateRef) {
@@ -57,11 +64,12 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                 return {
                     viewTransform: viewTransform,
                     nodePositions: nodePositionsArray,
-                    marriageNodePositions: marriageNodePositionsArray
+                    marriageNodePositions: marriageNodePositionsArray,
+                    performanceMode: performanceMode
                 };
             };
         }
-    }, [viewTransform, nodePositions, marriageNodePositions, getGenerationalViewStateRef]);
+    }, [viewTransform, nodePositions, marriageNodePositions, performanceMode, getGenerationalViewStateRef]);
 
     const generationData = useMemo(() => {
         const allPeople = Object.keys(treeData.people);
@@ -1265,6 +1273,13 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                 >
                     ↻
                 </button>
+                <button
+                    className={`gen-control-btn ${!performanceMode ? 'active' : ''}`}
+                    onClick={() => setPerformanceMode(!performanceMode)}
+                    title={performanceMode ? "Enable animations (slower)" : "Performance mode (faster)"}
+                >
+                    {performanceMode ? '⚡' : '✨'}
+                </button>
             </div>
 
             {viewTransform && (
@@ -1275,7 +1290,7 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                         transformOrigin: '0 0'
                     }}
                 >
-                <svg className="gen-tree-lines" style={{ overflow: 'visible' }}>
+                <svg className={`gen-tree-lines ${!performanceMode ? 'animations-enabled' : ''}`} style={{ overflow: 'visible' }}>
                     {connectionLines.map(line => {
                         // OPTIMIZATION: Skip rendering off-screen lines
                         if (!visibleLines.has(line.key)) return null;

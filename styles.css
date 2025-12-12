@@ -1872,8 +1872,6 @@
             stroke-width: 5;
             stroke-dasharray: 12 8;
             opacity: 0.4;
-            /* PERFORMANCE: Disabled animation for large families */
-            /* animation: dash-flow 5s linear infinite; */
         }
 
         .gen-path-parent {
@@ -1881,8 +1879,15 @@
             stroke-width: 4.5;
             stroke-dasharray: 10 7;
             opacity: 0.4;
-            /* PERFORMANCE: Disabled animation for large families */
-            /* animation: dash-flow 6s linear infinite; */
+        }
+
+        /* Only enable animations when performance mode is off */
+        .animations-enabled .gen-path-marriage {
+            animation: dash-flow 5s linear infinite;
+        }
+
+        .animations-enabled .gen-path-parent {
+            animation: dash-flow 6s linear infinite;
         }
 
         .gen-path-highlighted {
