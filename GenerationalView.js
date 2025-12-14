@@ -1552,7 +1552,7 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
                             top: `${selectionRect.y}px`,
                             width: `${selectionRect.width}px`,
                             height: `${selectionRect.height}px`,
-                            border: '2px dashed var(--primary)',
+                            border: '4px dashed var(--primary)',
                             background: 'rgba(var(--primary-rgb), 0.1)',
                             pointerEvents: 'none'
                         }}
