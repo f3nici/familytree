@@ -13,7 +13,7 @@ const Legend = () => {
                             className="legend-line-marriage"
                         />
                     </svg>
-                    <span className="legend-label">Marriage/Parent</span>
+                    <span className="legend-label">Partner/Parent</span>
                 </div>
                 <div className="legend-item">
                     <svg width="60" height="20" className="legend-line">
