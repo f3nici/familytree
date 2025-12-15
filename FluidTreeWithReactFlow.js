@@ -697,6 +697,7 @@ const FluidTreeInner = ({ treeData, selectedPerson, onSelectPerson, getNodePosit
                 <Background color="#e5ddd2" gap={20} size={1} />
                 {MiniMap && (
                     <MiniMap
+                        position="bottom-left"
                         nodeColor={(node) => {
                             if (node.type === 'personNode') {
                                 return 'var(--primary)';
