@@ -630,17 +630,121 @@ const FluidTreeInner = ({ treeData, selectedPerson, onSelectPerson, getNodePosit
         );
     }, [selectedPerson, setEdges]);
 
-    // Only update edges when relationships change, keep node positions stable
+    // Manually sync nodes and edges when relationships change, preserving positions
     React.useEffect(() => {
         const marriagesChanged = JSON.stringify(prevMarriagesRef.current) !== JSON.stringify(treeData.mariages);
 
         if (marriagesChanged) {
-            // Only recalculate edges, preserve existing node positions
-            const { edges: newEdges } = calculateFluidLayout(treeData, treeData.viewState);
-            setEdges(newEdges);
+            const nodeWidth = 180;
+            const nodeHeight = 140;
+            const marriageNodeSize = 30;
+
+            setNodes(currentNodes => {
+                // Keep all person nodes unchanged
+                const personNodes = currentNodes.filter(n => n.type === 'personNode');
+                const newMarriageNodes = [];
+
+                // Create marriage nodes for current relationships
+                treeData.mariages.forEach((marriage, marriageIdx) => {
+                    if (marriage.length < 2) return;
+
+                    const parent1Id = marriage[0];
+                    const parent2Id = marriage[1];
+                    const marriageNodeId = `marriage-${parent1Id}-${parent2Id}`;
+
+                    // Check if this marriage node already exists with this ID
+                    const existingNode = currentNodes.find(n => n.id === marriageNodeId);
+
+                    if (existingNode) {
+                        // Keep existing marriage node with its position
+                        newMarriageNodes.push(existingNode);
+                    } else {
+                        // New marriage - calculate default position
+                        const parent1Node = personNodes.find(n => n.id === parent1Id);
+                        const parent2Node = personNodes.find(n => n.id === parent2Id);
+
+                        if (parent1Node && parent2Node) {
+                            const defaultMarriageX = (parent1Node.position.x + parent2Node.position.x) / 2 + nodeWidth / 2;
+                            const defaultMarriageY = Math.max(parent1Node.position.y, parent2Node.position.y) + nodeHeight + 40;
+
+                            newMarriageNodes.push({
+                                id: marriageNodeId,
+                                type: 'marriageNode',
+                                position: { x: defaultMarriageX - marriageNodeSize / 2, y: defaultMarriageY },
+                                data: {},
+                            });
+                        }
+                    }
+                });
+
+                return [...personNodes, ...newMarriageNodes];
+            });
+
+            setEdges(currentEdges => {
+                const newEdges = [];
+
+                treeData.mariages.forEach((marriage, marriageIdx) => {
+                    if (marriage.length < 2) return;
+
+                    const parent1Id = marriage[0];
+                    const parent2Id = marriage[1];
+                    const childrenIds = marriage.slice(2);
+                    const marriageNodeId = `marriage-${parent1Id}-${parent2Id}`;
+
+                    // Parent to marriage edges
+                    newEdges.push({
+                        id: `edge-${parent1Id}-to-${marriageNodeId}`,
+                        source: parent1Id,
+                        sourceHandle: 'source-bottom',
+                        target: marriageNodeId,
+                        targetHandle: 'target-top',
+                        type: 'fluidEdge',
+                        data: {
+                            type: 'marriage',
+                            parent1Id,
+                            parent2Id
+                        },
+                    });
+
+                    newEdges.push({
+                        id: `edge-${parent2Id}-to-${marriageNodeId}`,
+                        source: parent2Id,
+                        sourceHandle: 'source-bottom',
+                        target: marriageNodeId,
+                        targetHandle: 'target-top',
+                        type: 'fluidEdge',
+                        data: {
+                            type: 'marriage',
+                            parent1Id,
+                            parent2Id
+                        },
+                    });
+
+                    // Marriage to children edges
+                    childrenIds.forEach(childId => {
+                        newEdges.push({
+                            id: `edge-${marriageNodeId}-to-${childId}`,
+                            source: marriageNodeId,
+                            sourceHandle: 'source-bottom',
+                            target: childId,
+                            targetHandle: 'target-top',
+                            type: 'fluidEdge',
+                            data: {
+                                type: 'child',
+                                parent1Id,
+                                parent2Id,
+                                childId
+                            },
+                        });
+                    });
+                });
+
+                return newEdges;
+            });
+
             prevMarriagesRef.current = treeData.mariages;
         }
-    }, [treeData.mariages, setEdges]);
+    }, [treeData.mariages, setNodes, setEdges]);
 
     // Clear selection when exiting multi-select mode
     React.useEffect(() => {
