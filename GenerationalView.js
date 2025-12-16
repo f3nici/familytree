@@ -772,17 +772,29 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
         const nodes = [];
         const { marriageNodePositions } = layout;
 
+        // Build a set of current marriage IDs from current data
+        const currentMarriageIds = new Set();
+        treeData.mariages.forEach(marriage => {
+            if (marriage.length >= 2) {
+                const marriageId = `marriage-${marriage[0]}-${marriage[1]}`;
+                currentMarriageIds.add(marriageId);
+            }
+        });
+
         marriageNodePositions.forEach((pos, nodeId) => {
-            nodes.push({
-                id: nodeId,
-                x: pos.x,
-                y: pos.y,
-                size: pos.size
-            });
+            // Only include marriage nodes that exist in current data
+            if (currentMarriageIds.has(nodeId)) {
+                nodes.push({
+                    id: nodeId,
+                    x: pos.x,
+                    y: pos.y,
+                    size: pos.size
+                });
+            }
         });
 
         return nodes;
-    }, [layout]);
+    }, [layout, treeData.mariages]);
 
     // OPTIMIZATION: Pre-calculate all relationships to avoid expensive recalculation on every render
     const relationshipsMap = useMemo(() => {
