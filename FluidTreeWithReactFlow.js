@@ -543,16 +543,25 @@ const FluidTreeControls = ({ nodes, edges, setNodes, isLocked, setIsLocked }) =>
 };
 
 const FluidTreeInner = ({ treeData, selectedPerson, onSelectPerson, getNodePositionsRef, isMultiSelectMode, selectedNodes, setSelectedNodes }) => {
+    // Track people count to detect when people are added/removed
+    const peopleCount = Object.keys(treeData.people).length;
+    const peopleCountRef = React.useRef(peopleCount);
+
+    // Only recalculate initial layout when people count actually changes
     const { nodes: initialNodes, edges: initialEdges } = React.useMemo(
-        () => calculateFluidLayout(treeData, treeData.viewState),
-        [treeData]
+        () => {
+            const result = calculateFluidLayout(treeData, treeData.viewState);
+            peopleCountRef.current = peopleCount;
+            return result;
+        },
+        [peopleCount]
     );
 
     const [nodes, setNodes, onNodesChangeBase] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
     const [isLocked, setIsLocked] = React.useState(true);
 
-    const prevTreeDataRef = React.useRef(treeData);
+    const prevMarriagesRef = React.useRef(treeData.mariages);
     const { fitView } = useReactFlow();
 
     // Custom onNodesChange handler that adds marriage nodes to selection
@@ -629,22 +638,147 @@ const FluidTreeInner = ({ treeData, selectedPerson, onSelectPerson, getNodePosit
         );
     }, [selectedPerson, setEdges]);
 
+    // Manually sync nodes and edges when relationships change, preserving positions
     React.useEffect(() => {
-        if (prevTreeDataRef.current !== treeData) {
-            const { nodes: newNodes, edges: newEdges } = calculateFluidLayout(treeData, treeData.viewState);
-            setNodes(newNodes);
-            setEdges(newEdges);
-            prevTreeDataRef.current = treeData;
+        const marriagesChanged = JSON.stringify(prevMarriagesRef.current) !== JSON.stringify(treeData.mariages);
 
-            setTimeout(() => {
-                fitView({
-                    padding: 0.2,
-                    duration: 800,
-                    maxZoom: 1.5
+        if (marriagesChanged) {
+            const nodeWidth = 180;
+            const nodeHeight = 140;
+            const marriageNodeSize = 30;
+
+            // Build a set of current marriage IDs we need
+            const neededMarriageIds = new Set();
+            treeData.mariages.forEach((marriage) => {
+                if (marriage.length < 2) return;
+                const parent1Id = marriage[0];
+                const parent2Id = marriage[1];
+                neededMarriageIds.add(`marriage-${parent1Id}-${parent2Id}`);
+            });
+
+            setNodes(currentNodes => {
+                // Find nodes to remove
+                const nodesToRemove = currentNodes.filter(
+                    node => node.type === 'marriageNode' && !neededMarriageIds.has(node.id)
+                ).map(node => node.id);
+
+                // Remove old marriage nodes (keep references to all other nodes)
+                let updatedNodes = currentNodes.filter(node => !nodesToRemove.includes(node.id));
+
+                // Find which marriage nodes we need to add
+                const nodesToAdd = [];
+                treeData.mariages.forEach((marriage) => {
+                    if (marriage.length < 2) return;
+
+                    const parent1Id = marriage[0];
+                    const parent2Id = marriage[1];
+                    const marriageNodeId = `marriage-${parent1Id}-${parent2Id}`;
+
+                    // Check if this marriage node already exists
+                    const exists = updatedNodes.some(n => n.id === marriageNodeId);
+
+                    if (!exists) {
+                        // New marriage - calculate default position and add it
+                        const parent1Node = updatedNodes.find(n => n.id === parent1Id);
+                        const parent2Node = updatedNodes.find(n => n.id === parent2Id);
+
+                        if (parent1Node && parent2Node) {
+                            const defaultMarriageX = (parent1Node.position.x + parent2Node.position.x) / 2 + nodeWidth / 2;
+                            const defaultMarriageY = Math.max(parent1Node.position.y, parent2Node.position.y) + nodeHeight + 40;
+
+                            nodesToAdd.push({
+                                id: marriageNodeId,
+                                type: 'marriageNode',
+                                position: { x: defaultMarriageX - marriageNodeSize / 2, y: defaultMarriageY },
+                                data: {},
+                            });
+                        }
+                    }
                 });
-            }, 100);
+
+                // Only create a new array if we have changes
+                if (nodesToRemove.length > 0 || nodesToAdd.length > 0) {
+                    return [...updatedNodes, ...nodesToAdd];
+                }
+
+                return currentNodes;
+            });
+
+            setEdges(currentEdges => {
+                // Build set of edge IDs we need to keep
+                const neededEdgeIds = new Set();
+                const edgesToAdd = [];
+
+                treeData.mariages.forEach((marriage) => {
+                    if (marriage.length < 2) return;
+
+                    const parent1Id = marriage[0];
+                    const parent2Id = marriage[1];
+                    const childrenIds = marriage.slice(2);
+                    const marriageNodeId = `marriage-${parent1Id}-${parent2Id}`;
+
+                    const edge1Id = `edge-${parent1Id}-to-${marriageNodeId}`;
+                    const edge2Id = `edge-${parent2Id}-to-${marriageNodeId}`;
+                    neededEdgeIds.add(edge1Id);
+                    neededEdgeIds.add(edge2Id);
+
+                    // Check if edges exist, if not add them
+                    if (!currentEdges.find(e => e.id === edge1Id)) {
+                        edgesToAdd.push({
+                            id: edge1Id,
+                            source: parent1Id,
+                            sourceHandle: 'source-bottom',
+                            target: marriageNodeId,
+                            targetHandle: 'target-top',
+                            type: 'fluidEdge',
+                            data: { type: 'marriage', parent1Id, parent2Id },
+                        });
+                    }
+
+                    if (!currentEdges.find(e => e.id === edge2Id)) {
+                        edgesToAdd.push({
+                            id: edge2Id,
+                            source: parent2Id,
+                            sourceHandle: 'source-bottom',
+                            target: marriageNodeId,
+                            targetHandle: 'target-top',
+                            type: 'fluidEdge',
+                            data: { type: 'marriage', parent1Id, parent2Id },
+                        });
+                    }
+
+                    childrenIds.forEach(childId => {
+                        const childEdgeId = `edge-${marriageNodeId}-to-${childId}`;
+                        neededEdgeIds.add(childEdgeId);
+
+                        if (!currentEdges.find(e => e.id === childEdgeId)) {
+                            edgesToAdd.push({
+                                id: childEdgeId,
+                                source: marriageNodeId,
+                                sourceHandle: 'source-bottom',
+                                target: childId,
+                                targetHandle: 'target-top',
+                                type: 'fluidEdge',
+                                data: { type: 'child', parent1Id, parent2Id, childId },
+                            });
+                        }
+                    });
+                });
+
+                // Remove edges that are no longer needed
+                const keptEdges = currentEdges.filter(edge => neededEdgeIds.has(edge.id));
+
+                // Only create new array if there are changes
+                if (keptEdges.length !== currentEdges.length || edgesToAdd.length > 0) {
+                    return [...keptEdges, ...edgesToAdd];
+                }
+
+                return currentEdges;
+            });
+
+            prevMarriagesRef.current = treeData.mariages;
         }
-    }, [treeData, setNodes, setEdges, fitView]);
+    }, [treeData.mariages, setNodes, setEdges]);
 
     // Clear selection when exiting multi-select mode
     React.useEffect(() => {
@@ -684,6 +818,7 @@ const FluidTreeInner = ({ treeData, selectedPerson, onSelectPerson, getNodePosit
                 nodeTypes={nodeTypes}
                 edgeTypes={edgeTypes}
                 fitView
+                fitViewOptions={{ duration: 0 }}
                 minZoom={0.01}
                 maxZoom={2}
                 defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
@@ -693,6 +828,8 @@ const FluidTreeInner = ({ treeData, selectedPerson, onSelectPerson, getNodePosit
                 panOnDrag={isMultiSelectMode ? [2] : true}
                 selectionOnDrag={isMultiSelectMode}
                 panOnScroll={isMultiSelectMode}
+                autoPanOnNodeDrag={false}
+                autoPanOnConnect={false}
             >
                 <Background color="#e5ddd2" gap={20} size={1} />
                 {MiniMap && (
