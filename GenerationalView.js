@@ -48,6 +48,22 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
     const [selectionRect, setSelectionRect] = useState(null);
     const [selectionStart, setSelectionStart] = useState(null);
 
+    // Store stable marriages data that only updates on regenerate or when people are added
+    const [stableMarriages, setStableMarriages] = useState(treeData.mariages);
+    const [stablePeople, setStablePeople] = useState(treeData.people);
+
+    // Update stable people when new people are added (but not when just edited)
+    useEffect(() => {
+        const currentPeopleCount = Object.keys(stablePeople).length;
+        const newPeopleCount = Object.keys(treeData.people).length;
+
+        if (newPeopleCount > currentPeopleCount) {
+            // People were added, update stable data
+            setStablePeople(treeData.people);
+            setStableMarriages(treeData.mariages);
+        }
+    }, [Object.keys(treeData.people).length]);
+
     useEffect(() => {
         if (getGenerationalViewStateRef) {
             getGenerationalViewStateRef.current = () => {
@@ -73,15 +89,16 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
         }
     }, [viewTransform, nodePositions, marriageNodePositions, performanceMode, getGenerationalViewStateRef]);
 
+    // Only recalculate generation assignments when people are added/removed or positions are reset
     const generationData = useMemo(() => {
-        const allPeople = Object.keys(treeData.people);
+        const allPeople = Object.keys(stablePeople);
         const personGeneration = new Map();
 
         const childToParents = new Map();
         const personToSpouses = new Map();
         const personToChildren = new Map();
 
-        treeData.mariages.forEach((marriage, idx) => {
+        stableMarriages.forEach((marriage, idx) => {
             if (marriage.length < 2) return;
 
             const [parent1, parent2, ...children] = marriage;
@@ -212,7 +229,7 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
             childToParents,
             personToSpouses
         };
-    }, [treeData]);
+    }, [stableMarriages, stablePeople]);
 
     const layout = useMemo(() => {
         const CARD_WIDTH = 200;
@@ -220,7 +237,7 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
         const MARRIAGE_SIZE = 30;
 
         const marriagesPerGeneration = new Map();
-        treeData.mariages.forEach((marriage, idx) => {
+        stableMarriages.forEach((marriage, idx) => {
             if (marriage.length < 2) return;
             const [parent1, parent2] = marriage;
             const gen = generationData.personGeneration.get(parent1);
@@ -240,11 +257,11 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
         const nodes = [];
         const edges = [];
 
-        Object.keys(treeData.people).forEach(personId => {
+        Object.keys(stablePeople).forEach(personId => {
             nodes.push({ id: personId, type: 'person' });
         });
 
-        treeData.mariages.forEach((marriage, idx) => {
+        stableMarriages.forEach((marriage, idx) => {
             if (marriage.length < 2) return;
 
             const [parent1, parent2, ...children] = marriage;
@@ -329,9 +346,10 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
 
             const customPos = nodePositions.get(nodeId);
             if (customPos) {
+                // Preserve both custom X and Y positions
                 positions.set(nodeId, {
                     x: customPos.x,
-                    y: baseY + yOffset,
+                    y: customPos.y !== undefined ? customPos.y : (baseY + yOffset),
                     width: CARD_WIDTH,
                     height: CARD_HEIGHT
                 });
@@ -347,7 +365,7 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
 
         initialMarriagePositions.forEach((pos, nodeId) => {
             const idx = parseInt(nodeId.split('-')[1]);
-            const marriage = treeData.mariages[idx];
+            const marriage = stableMarriages[idx];
             if (marriage && marriage.length >= 2) {
                 const parentGen = generationData.personGeneration.get(marriage[0]) || 0;
                 const yOffset = generationYOffsets.get(parentGen) || 0;
@@ -385,7 +403,7 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
         });
 
         const personMarriages = new Map();
-        treeData.mariages.forEach((marriage, idx) => {
+        stableMarriages.forEach((marriage, idx) => {
             if (marriage.length < 2) return;
             const [parent1, parent2] = marriage;
 
@@ -433,7 +451,7 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
             MARRIAGE_SIZE,
             marriagesPerGeneration
         };
-    }, [generationData, treeData, nodePositions, marriageNodePositions]);
+    }, [generationData, stableMarriages, nodePositions, marriageNodePositions]);
 
     // Extract horizontal and vertical segments from SVG path
     const extractSegments = (path) => {
@@ -1293,11 +1311,14 @@ const GenerationalView = ({ treeData, selectedPerson, onSelectPerson, getGenerat
     const recalculateLayout = useCallback(() => {
         setNodePositions(new Map());
         setMarriageNodePositions(new Map());
+        // Update stable data to trigger full regeneration
+        setStableMarriages(treeData.mariages);
+        setStablePeople(treeData.people);
         // Reset zoom after a short delay to allow layout to recalculate
         setTimeout(() => {
             zoomToFit();
         }, 100);
-    }, [zoomToFit]);
+    }, [zoomToFit, treeData.mariages, treeData.people]);
 
     const zoomIn = useCallback(() => {
         if (!viewTransform || !containerRef.current) return;

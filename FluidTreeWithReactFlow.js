@@ -543,16 +543,17 @@ const FluidTreeControls = ({ nodes, edges, setNodes, isLocked, setIsLocked }) =>
 };
 
 const FluidTreeInner = ({ treeData, selectedPerson, onSelectPerson, getNodePositionsRef, isMultiSelectMode, selectedNodes, setSelectedNodes }) => {
+    // Only recalculate layout when people are added/removed, not when relationships change
     const { nodes: initialNodes, edges: initialEdges } = React.useMemo(
         () => calculateFluidLayout(treeData, treeData.viewState),
-        [treeData]
+        [Object.keys(treeData.people).length, treeData.viewState]
     );
 
     const [nodes, setNodes, onNodesChangeBase] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
     const [isLocked, setIsLocked] = React.useState(true);
 
-    const prevTreeDataRef = React.useRef(treeData);
+    const prevMarriagesRef = React.useRef(treeData.mariages);
     const { fitView } = useReactFlow();
 
     // Custom onNodesChange handler that adds marriage nodes to selection
@@ -629,22 +630,17 @@ const FluidTreeInner = ({ treeData, selectedPerson, onSelectPerson, getNodePosit
         );
     }, [selectedPerson, setEdges]);
 
+    // Only update edges when relationships change, keep node positions stable
     React.useEffect(() => {
-        if (prevTreeDataRef.current !== treeData) {
-            const { nodes: newNodes, edges: newEdges } = calculateFluidLayout(treeData, treeData.viewState);
-            setNodes(newNodes);
-            setEdges(newEdges);
-            prevTreeDataRef.current = treeData;
+        const marriagesChanged = JSON.stringify(prevMarriagesRef.current) !== JSON.stringify(treeData.mariages);
 
-            setTimeout(() => {
-                fitView({
-                    padding: 0.2,
-                    duration: 800,
-                    maxZoom: 1.5
-                });
-            }, 100);
+        if (marriagesChanged) {
+            // Only recalculate edges, preserve existing node positions
+            const { edges: newEdges } = calculateFluidLayout(treeData, treeData.viewState);
+            setEdges(newEdges);
+            prevMarriagesRef.current = treeData.mariages;
         }
-    }, [treeData, setNodes, setEdges, fitView]);
+    }, [treeData.mariages, setEdges]);
 
     // Clear selection when exiting multi-select mode
     React.useEffect(() => {
